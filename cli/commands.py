@@ -28,6 +28,7 @@ def cli():
 @cli.command()
 def setup():
     """Log in to Crosslist (one-time setup). Opens a browser for you to sign in."""
+    import time
     from pathlib import Path
     from playwright.sync_api import sync_playwright
 
@@ -35,7 +36,8 @@ def setup():
 
     console.print("[bold]Crosslist Login Setup[/bold]")
     console.print("A browser window will open to Crosslist.")
-    console.print("Log in with your account — your session will be saved for future scrapes.\n")
+    console.print("Log in with your account — your session will be saved for future scrapes.")
+    console.print("[bold]Press Enter here in the terminal when you're done logging in.[/bold]\n")
 
     with sync_playwright() as p:
         context = p.chromium.launch_persistent_context(
@@ -46,22 +48,28 @@ def setup():
         page = context.pages[0] if context.pages else context.new_page()
         page.goto("https://app.crosslist.com/", timeout=60000)
 
-        console.print("[dim]Waiting for login... (sign in with your Crosslist account)[/dim]")
+        console.print("[dim]Browser is open. Log in to Crosslist, then come back here and press Enter.[/dim]")
 
         try:
-            for _ in range(120):
-                import time
-                time.sleep(1)
-                url = page.url.lower()
-                if "login" not in url and "signin" not in url and "sign-in" not in url:
-                    console.print(f"[green]Success![/green] Logged in. Session saved.")
-                    console.print("You can now run 'scrape' to pull your listings.")
-                    page.wait_for_timeout(3000)
-                    break
-        except Exception:
+            input("\n>>> Press Enter after you've logged in successfully... ")
+        except (EOFError, KeyboardInterrupt):
             pass
 
-        context.close()
+        # Verify login worked
+        try:
+            url = page.url.lower()
+            if "login" in url or "signin" in url:
+                console.print("[yellow]Warning:[/yellow] Still on login page. Session may not be saved.")
+            else:
+                console.print("[green]Success![/green] Session saved.")
+                console.print("You can now run 'scrape' to pull your listings.")
+        except Exception:
+            console.print("[green]Done.[/green] Session saved (browser was closed).")
+
+        try:
+            context.close()
+        except Exception:
+            pass
 
 
 @cli.command()
