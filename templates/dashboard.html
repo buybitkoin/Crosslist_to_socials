@@ -1,0 +1,339 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Social Media Agent</title>
+    <style>
+        :root {
+            --bg: #f5f5f5;
+            --card-bg: #ffffff;
+            --text: #333333;
+            --text-muted: #666666;
+            --border: #e5e5e5;
+            --hover: #f8fafc;
+            --accent: #2563eb;
+            --success: #16a34a;
+            --danger: #dc2626;
+            --badge-pinterest-bg: #fce7f3;
+            --badge-pinterest-text: #be185d;
+            --badge-instagram-bg: #ede9fe;
+            --badge-instagram-text: #6d28d9;
+            --alert-info-bg: #dbeafe;
+            --alert-info-text: #1e40af;
+            --alert-success-bg: #dcfce7;
+            --alert-success-text: #166534;
+            --alert-error-bg: #fee2e2;
+            --alert-error-text: #991b1b;
+        }
+
+        [data-theme="dark"] {
+            --bg: #1a1a2e;
+            --card-bg: #16213e;
+            --text: #e0e0e0;
+            --text-muted: #a0a0a0;
+            --border: #2a2a4a;
+            --hover: #1e2a4a;
+            --accent: #60a5fa;
+            --success: #4ade80;
+            --danger: #f87171;
+            --badge-pinterest-bg: #4a1942;
+            --badge-pinterest-text: #f9a8d4;
+            --badge-instagram-bg: #2e1065;
+            --badge-instagram-text: #c4b5fd;
+            --alert-info-bg: #1e3a5f;
+            --alert-info-text: #93c5fd;
+            --alert-success-bg: #14532d;
+            --alert-success-text: #86efac;
+            --alert-error-bg: #451a1a;
+            --alert-error-text: #fca5a5;
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: var(--bg); color: var(--text); padding: 20px; max-width: 1200px; margin: 0 auto; transition: background 0.3s, color 0.3s; }
+
+        .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
+        .header h1 { font-size: 1.5rem; }
+        .header-actions { display: flex; gap: 8px; align-items: center; }
+
+        h2 { margin: 24px 0 12px; font-size: 1.1rem; color: var(--text-muted); }
+
+        .stats { display: flex; gap: 12px; flex-wrap: wrap; margin-bottom: 20px; }
+        .stat-card { background: var(--card-bg); border-radius: 8px; padding: 16px 20px; min-width: 120px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); border: 1px solid var(--border); }
+        .stat-card .number { font-size: 1.8rem; font-weight: 700; color: var(--accent); }
+        .stat-card .label { font-size: 0.8rem; color: var(--text-muted); margin-top: 4px; }
+
+        .actions { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 20px; }
+        .actions form { display: inline; }
+        .btn { padding: 10px 18px; border: none; border-radius: 6px; font-size: 0.9rem; cursor: pointer; font-weight: 500; transition: opacity 0.2s; text-decoration: none; display: inline-block; }
+        .btn:hover { opacity: 0.85; }
+        .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+        .btn-blue { background: var(--accent); color: white; }
+        .btn-green { background: var(--success); color: white; }
+        .btn-red { background: var(--danger); color: white; }
+        .btn-gray { background: #6b7280; color: white; }
+        .btn-sm { padding: 6px 12px; font-size: 0.8rem; }
+
+        .alert { padding: 12px 16px; border-radius: 6px; margin-bottom: 16px; display: flex; justify-content: space-between; align-items: center; }
+        .alert-info { background: var(--alert-info-bg); color: var(--alert-info-text); }
+        .alert-success { background: var(--alert-success-bg); color: var(--alert-success-text); }
+        .alert-error { background: var(--alert-error-bg); color: var(--alert-error-text); }
+        .alert form { display: inline; }
+
+        .scheduler-bar { background: var(--card-bg); border: 1px solid var(--border); border-radius: 8px; padding: 12px 16px; margin-bottom: 16px; display: flex; justify-content: space-between; align-items: center; font-size: 0.85rem; }
+        .scheduler-bar .status { color: var(--text-muted); }
+        .scheduler-bar .status.active { color: var(--success); }
+
+        .post-table { width: 100%; border-collapse: collapse; background: var(--card-bg); border-radius: 8px; overflow: hidden; box-shadow: 0 1px 3px rgba(0,0,0,0.1); margin-bottom: 20px; border: 1px solid var(--border); }
+        .post-table th { background: var(--hover); text-align: left; padding: 10px 14px; font-size: 0.8rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; }
+        .post-table td { padding: 12px 14px; border-top: 1px solid var(--border); font-size: 0.9rem; vertical-align: top; }
+        .post-table tr:hover { background: var(--hover); }
+
+        .caption-preview { max-width: 350px; white-space: pre-wrap; font-size: 0.85rem; line-height: 1.4; color: var(--text-muted); }
+        .caption-preview.truncated { max-height: 60px; overflow: hidden; }
+
+        .post-img { width: 50px; height: 50px; object-fit: cover; border-radius: 4px; }
+        .platform-badge { display: inline-block; padding: 2px 8px; border-radius: 12px; font-size: 0.75rem; font-weight: 500; }
+        .platform-badge.pinterest { background: var(--badge-pinterest-bg); color: var(--badge-pinterest-text); }
+        .platform-badge.instagram { background: var(--badge-instagram-bg); color: var(--badge-instagram-text); }
+
+        .edit-form { margin-top: 8px; }
+        .edit-form textarea { width: 100%; min-height: 80px; padding: 8px; border: 1px solid var(--border); border-radius: 4px; font-size: 0.85rem; resize: vertical; background: var(--bg); color: var(--text); }
+
+        .empty { text-align: center; padding: 40px; color: var(--text-muted); }
+
+        /* Dark mode toggle */
+        .theme-toggle { background: var(--card-bg); border: 1px solid var(--border); border-radius: 6px; padding: 8px 12px; cursor: pointer; font-size: 1.1rem; line-height: 1; }
+        .theme-toggle:hover { background: var(--hover); }
+
+        @media (max-width: 768px) {
+            body { padding: 12px; }
+            .header { flex-direction: column; align-items: flex-start; gap: 12px; }
+            .stats { gap: 8px; }
+            .stat-card { min-width: 80px; padding: 12px; }
+            .stat-card .number { font-size: 1.4rem; }
+            .post-table { font-size: 0.8rem; }
+            .actions { gap: 6px; }
+            .btn { padding: 8px 14px; font-size: 0.85rem; }
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>Social Media Agent</h1>
+        <div class="header-actions">
+            <a href="/settings" class="btn btn-sm btn-gray">Settings</a>
+            <button class="theme-toggle" onclick="toggleTheme()" title="Toggle dark mode" id="themeBtn">🌙</button>
+        </div>
+    </div>
+
+    <!-- Status Alert -->
+    {% if task_status.message %}
+    <div class="alert {% if 'Error' in task_status.message or 'error' in task_status.message %}alert-error{% elif 'Done' in task_status.message or 'done' in task_status.message %}alert-success{% else %}alert-info{% endif %}">
+        <span>
+            {% if task_status.running %}&#9203;{% endif %}
+            {{ task_status.message }}
+        </span>
+        {% if not task_status.running %}
+        <form action="/clear-status" method="post">
+            <button class="btn btn-sm btn-gray" type="submit">Dismiss</button>
+        </form>
+        {% endif %}
+    </div>
+    {% endif %}
+
+    <!-- Scheduler Status Bar -->
+    {% if scheduler.enabled %}
+    <div class="scheduler-bar">
+        <span class="status active">Auto-posting enabled (every {{ scheduler.interval_hours }}h) &mdash; Next run: {{ scheduler.next_run or 'pending' }}</span>
+        <form action="/run-now" method="post" style="display:inline;">
+            <button class="btn btn-sm btn-blue" type="submit" {% if task_status.running %}disabled{% endif %}>Run Now</button>
+        </form>
+    </div>
+    {% endif %}
+
+    <!-- Stats -->
+    <div class="stats">
+        <div class="stat-card">
+            <div class="number">{{ stats.total_listings }}</div>
+            <div class="label">Listings</div>
+        </div>
+        <div class="stat-card">
+            <div class="number">{{ stats.draft or 0 }}</div>
+            <div class="label">Drafts</div>
+        </div>
+        <div class="stat-card">
+            <div class="number">{{ stats.approved or 0 }}</div>
+            <div class="label">Ready</div>
+        </div>
+        <div class="stat-card">
+            <div class="number">{{ stats.published or 0 }}</div>
+            <div class="label">Published</div>
+        </div>
+    </div>
+
+    <!-- Action Buttons -->
+    <div class="actions">
+        <form action="/scrape" method="post">
+            <button class="btn btn-blue" type="submit" {% if task_status.running %}disabled{% endif %}>
+                Scrape Listings
+            </button>
+        </form>
+        <form action="/generate" method="post">
+            <input type="hidden" name="platform" value="pinterest">
+            <button class="btn btn-blue" type="submit" {% if task_status.running %}disabled{% endif %}>
+                Generate (Pinterest)
+            </button>
+        </form>
+        <form action="/generate" method="post">
+            <input type="hidden" name="platform" value="instagram">
+            <button class="btn btn-blue" type="submit" {% if task_status.running %}disabled{% endif %}>
+                Generate (Instagram)
+            </button>
+        </form>
+        {% if has_pinterest %}
+        <form action="/publish" method="post">
+            <input type="hidden" name="platform" value="pinterest">
+            <button class="btn btn-green" type="submit" {% if task_status.running %}disabled{% endif %}>
+                Publish to Pinterest
+            </button>
+        </form>
+        {% endif %}
+    </div>
+
+    <!-- Drafts -->
+    <h2>Drafts ({{ drafts|length }})</h2>
+    {% if drafts %}
+    <div style="margin-bottom: 12px;">
+        <form action="/approve-all" method="post" style="display:inline;">
+            <button class="btn btn-sm btn-green" type="submit">Approve All</button>
+        </form>
+    </div>
+    <table class="post-table">
+        <thead>
+            <tr>
+                <th>Image</th>
+                <th>Listing</th>
+                <th>Platform</th>
+                <th>Caption</th>
+                <th>Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for post in drafts %}
+            <tr>
+                <td>
+                    {% if post.image_urls %}
+                    <img class="post-img" src="{{ post.image_urls[0] }}" alt="" loading="lazy">
+                    {% endif %}
+                </td>
+                <td>{{ post._listing_title[:40] }}</td>
+                <td><span class="platform-badge {{ post.platform.value }}">{{ post.platform.value }}</span></td>
+                <td>
+                    <div class="caption-preview truncated">{{ post.caption }}</div>
+                    <details class="edit-form">
+                        <summary style="font-size: 0.8rem; color: var(--accent); cursor: pointer; margin-top: 4px;">Edit</summary>
+                        <form action="/edit/{{ post.id }}" method="post">
+                            <textarea name="caption">{{ post.caption }}</textarea>
+                            <button class="btn btn-sm btn-blue" type="submit" style="margin-top: 4px;">Save & Approve</button>
+                        </form>
+                    </details>
+                </td>
+                <td>
+                    <form action="/approve/{{ post.id }}" method="post" style="display:inline;">
+                        <button class="btn btn-sm btn-green" type="submit">Approve</button>
+                    </form>
+                    <form action="/reject/{{ post.id }}" method="post" style="display:inline; margin-left: 4px;">
+                        <button class="btn btn-sm btn-red" type="submit">Reject</button>
+                    </form>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    {% else %}
+    <div class="empty">No drafts. Scrape listings and generate captions to get started.</div>
+    {% endif %}
+
+    <!-- Approved / Ready to Publish -->
+    {% if approved %}
+    <h2>Ready to Publish ({{ approved|length }})</h2>
+    <table class="post-table">
+        <thead>
+            <tr>
+                <th>Image</th>
+                <th>Listing</th>
+                <th>Platform</th>
+                <th>Caption</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for post in approved %}
+            <tr>
+                <td>
+                    {% if post.image_urls %}
+                    <img class="post-img" src="{{ post.image_urls[0] }}" alt="" loading="lazy">
+                    {% endif %}
+                </td>
+                <td>{{ post._listing_title[:40] }}</td>
+                <td><span class="platform-badge {{ post.platform.value }}">{{ post.platform.value }}</span></td>
+                <td><div class="caption-preview">{{ post.caption[:120] }}{% if post.caption|length > 120 %}...{% endif %}</div></td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    {% endif %}
+
+    <!-- Recently Published -->
+    {% if published %}
+    <h2>Recently Published</h2>
+    <table class="post-table">
+        <thead>
+            <tr>
+                <th>Image</th>
+                <th>Listing</th>
+                <th>Platform</th>
+                <th>Published</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for post in published %}
+            <tr>
+                <td>
+                    {% if post.image_urls %}
+                    <img class="post-img" src="{{ post.image_urls[0] }}" alt="" loading="lazy">
+                    {% endif %}
+                </td>
+                <td>{{ post._listing_title[:40] }}</td>
+                <td><span class="platform-badge {{ post.platform.value }}">{{ post.platform.value }}</span></td>
+                <td style="font-size: 0.8rem; color: var(--text-muted);">{{ post.published_at[:16] if post.published_at else '' }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    {% endif %}
+
+    <!-- Auto-refresh when task is running -->
+    {% if task_status.running %}
+    <script>setTimeout(() => location.reload(), 3000);</script>
+    {% endif %}
+
+    <script>
+        function toggleTheme() {
+            const html = document.documentElement;
+            const current = html.getAttribute('data-theme');
+            const next = current === 'dark' ? 'light' : 'dark';
+            html.setAttribute('data-theme', next);
+            localStorage.setItem('theme', next);
+            document.getElementById('themeBtn').textContent = next === 'dark' ? '☀️' : '🌙';
+        }
+
+        // Load saved theme
+        (function() {
+            const saved = localStorage.getItem('theme') || 'light';
+            document.documentElement.setAttribute('data-theme', saved);
+            document.getElementById('themeBtn').textContent = saved === 'dark' ? '☀️' : '🌙';
+        })();
+    </script>
+</body>
+</html>

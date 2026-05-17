@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Settings - Social Media Agent</title>
+    <style>
+        :root {
+            --bg: #f5f5f5;
+            --card-bg: #ffffff;
+            --text: #333333;
+            --text-muted: #666666;
+            --border: #e5e5e5;
+            --hover: #f8fafc;
+            --accent: #2563eb;
+            --success: #16a34a;
+            --input-bg: #ffffff;
+        }
+
+        [data-theme="dark"] {
+            --bg: #1a1a2e;
+            --card-bg: #16213e;
+            --text: #e0e0e0;
+            --text-muted: #a0a0a0;
+            --border: #2a2a4a;
+            --hover: #1e2a4a;
+            --accent: #60a5fa;
+            --success: #4ade80;
+            --input-bg: #1e2a4a;
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: var(--bg); color: var(--text); padding: 20px; max-width: 700px; margin: 0 auto; transition: background 0.3s, color 0.3s; }
+
+        .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px; }
+        .header h1 { font-size: 1.5rem; }
+
+        .back-link { color: var(--accent); text-decoration: none; font-size: 0.9rem; }
+        .back-link:hover { text-decoration: underline; }
+
+        .card { background: var(--card-bg); border: 1px solid var(--border); border-radius: 8px; padding: 24px; margin-bottom: 20px; }
+        .card h2 { font-size: 1rem; margin-bottom: 16px; color: var(--text); }
+
+        .form-group { margin-bottom: 16px; }
+        .form-group label { display: block; font-size: 0.85rem; font-weight: 500; margin-bottom: 6px; color: var(--text); }
+        .form-group .hint { font-size: 0.8rem; color: var(--text-muted); margin-top: 4px; }
+
+        input[type="text"], input[type="number"], select {
+            width: 100%;
+            padding: 10px 12px;
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            font-size: 0.9rem;
+            background: var(--input-bg);
+            color: var(--text);
+            transition: border-color 0.2s;
+        }
+        input[type="text"]:focus, input[type="number"]:focus, select:focus {
+            outline: none;
+            border-color: var(--accent);
+        }
+
+        .checkbox-group { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; }
+        .checkbox-group input[type="checkbox"] { width: 18px; height: 18px; accent-color: var(--accent); }
+        .checkbox-group label { font-size: 0.9rem; margin-bottom: 0; cursor: pointer; }
+
+        .btn { padding: 10px 20px; border: none; border-radius: 6px; font-size: 0.9rem; cursor: pointer; font-weight: 500; transition: opacity 0.2s; }
+        .btn:hover { opacity: 0.85; }
+        .btn-blue { background: var(--accent); color: white; }
+        .btn-gray { background: #6b7280; color: white; }
+        .btn-sm { padding: 6px 12px; font-size: 0.8rem; }
+
+        .scheduler-status { padding: 12px 16px; border-radius: 6px; font-size: 0.85rem; margin-top: 12px; }
+        .scheduler-status.active { background: #dcfce7; color: #166534; }
+        .scheduler-status.inactive { background: var(--hover); color: var(--text-muted); }
+
+        [data-theme="dark"] .scheduler-status.active { background: #14532d; color: #86efac; }
+
+        .divider { border: none; border-top: 1px solid var(--border); margin: 20px 0; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>Settings</h1>
+        <a href="/" class="back-link">&larr; Back to Dashboard</a>
+    </div>
+
+    <form action="/settings" method="post">
+        <!-- Shop Settings -->
+        <div class="card">
+            <h2>Depop Shop</h2>
+            <div class="form-group">
+                <label for="shop_username">Shop Username</label>
+                <input type="text" id="shop_username" name="shop_username" value="{{ settings.shop_username }}" placeholder="your_depop_username">
+                <div class="hint">Your Depop shop username (the part after depop.com/)</div>
+            </div>
+        </div>
+
+        <!-- Caption Settings -->
+        <div class="card">
+            <h2>Caption Generation</h2>
+            <div class="checkbox-group">
+                <input type="checkbox" id="use_ai_captions" name="use_ai_captions" {% if settings.use_ai_captions %}checked{% endif %}>
+                <label for="use_ai_captions">Use AI-generated captions (Claude)</label>
+            </div>
+            <div class="hint" style="margin-left: 28px;">When disabled, captions are built from the listing title/description directly. Requires ANTHROPIC_API_KEY in .env file.</div>
+        </div>
+
+        <!-- Auto-Posting Settings -->
+        <div class="card">
+            <h2>Automatic Posting</h2>
+
+            <div class="checkbox-group">
+                <input type="checkbox" id="auto_post_enabled" name="auto_post_enabled" {% if settings.auto_post_enabled %}checked{% endif %}>
+                <label for="auto_post_enabled">Enable automatic posting</label>
+            </div>
+            <div class="hint" style="margin-left: 28px; margin-bottom: 16px;">When enabled, the bot will automatically scrape, generate captions, and publish on a schedule.</div>
+
+            <div class="form-group">
+                <label for="auto_post_interval_hours">Post every (hours)</label>
+                <input type="number" id="auto_post_interval_hours" name="auto_post_interval_hours" value="{{ settings.auto_post_interval_hours }}" min="1" max="72" step="1">
+                <div class="hint">How often to run the full pipeline (scrape + generate + publish)</div>
+            </div>
+
+            <div class="form-group">
+                <label for="auto_post_platform">Platform</label>
+                <select id="auto_post_platform" name="auto_post_platform">
+                    <option value="pinterest" {% if settings.auto_post_platform == 'pinterest' %}selected{% endif %}>Pinterest</option>
+                    <option value="instagram" {% if settings.auto_post_platform == 'instagram' %}selected{% endif %}>Instagram</option>
+                </select>
+            </div>
+
+            <div class="checkbox-group">
+                <input type="checkbox" id="auto_approve" name="auto_approve" {% if settings.auto_approve %}checked{% endif %}>
+                <label for="auto_approve">Auto-approve posts (skip review)</label>
+            </div>
+            <div class="hint" style="margin-left: 28px;">When enabled, new posts are published immediately without manual review. Leave unchecked to review drafts before they go live.</div>
+
+            {% if scheduler.enabled %}
+            <div class="scheduler-status active">
+                Scheduler is active. Next run: {{ scheduler.next_run or 'calculating...' }}
+            </div>
+            {% else %}
+            <div class="scheduler-status inactive">
+                Scheduler is not running. Enable automatic posting and save to start.
+            </div>
+            {% endif %}
+        </div>
+
+        <button type="submit" class="btn btn-blue">Save Settings</button>
+    </form>
+
+    <script>
+        (function() {
+            const saved = localStorage.getItem('theme') || 'light';
+            document.documentElement.setAttribute('data-theme', saved);
+        })();
+    </script>
+</body>
+</html>
