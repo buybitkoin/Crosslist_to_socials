@@ -313,6 +313,14 @@ def reject(post_id: int):
     return redirect(url_for("dashboard"))
 
 
+@app.route("/unapprove/<int:post_id>", methods=["POST"])
+def unapprove(post_id: int):
+    db = get_db()
+    db.unapprove_post(post_id)
+    db.close()
+    return redirect(url_for("dashboard"))
+
+
 @app.route("/approve-all", methods=["POST"])
 def approve_all():
     db = get_db()

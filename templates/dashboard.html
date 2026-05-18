@@ -265,6 +265,7 @@
                 <th>Listing</th>
                 <th>Platform</th>
                 <th>Caption</th>
+                <th>Actions</th>
             </tr>
         </thead>
         <tbody>
@@ -278,6 +279,11 @@
                 <td>{{ post._listing_title[:40] }}</td>
                 <td><span class="platform-badge {{ post.platform.value }}">{{ post.platform.value }}</span></td>
                 <td><div class="caption-preview">{{ post.caption[:120] }}{% if post.caption|length > 120 %}...{% endif %}</div></td>
+                <td>
+                    <form action="/unapprove/{{ post.id }}" method="post" style="display:inline;">
+                        <button class="btn btn-sm btn-gray" type="submit">Back to Draft</button>
+                    </form>
+                </td>
             </tr>
             {% endfor %}
         </tbody>

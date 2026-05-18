@@ -172,6 +172,13 @@ class Database:
         self.conn.execute("DELETE FROM posts WHERE id = ?", (post_id,))
         self.conn.commit()
 
+    def unapprove_post(self, post_id: int):
+        self.conn.execute(
+            "UPDATE posts SET status = ?, updated_at = ? WHERE id = ?",
+            (PostStatus.DRAFT.value, datetime.now().isoformat(), post_id),
+        )
+        self.conn.commit()
+
     def reject_all_drafts(self):
         self.conn.execute("DELETE FROM posts WHERE status = ?", (PostStatus.DRAFT.value,))
         self.conn.commit()
