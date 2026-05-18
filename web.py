@@ -62,6 +62,14 @@ def get_shop_username() -> str:
     return settings.get("shop_username") or config.DEPOP_SHOP_USERNAME
 
 
+def get_pinterest_credentials() -> tuple[str, str]:
+    """Get Pinterest access token and board ID from settings or .env."""
+    settings = load_settings()
+    token = settings.get("pinterest_access_token") or config.PINTEREST_ACCESS_TOKEN
+    board_id = settings.get("pinterest_board_id") or config.PINTEREST_BOARD_ID
+    return token, board_id
+
+
 # --- Scheduler ---
 
 def run_scheduled_pipeline():
@@ -120,8 +128,9 @@ def run_scheduled_pipeline():
         # Step 4: Publish approved posts
         approved_posts = db.get_posts(status=PostStatus.APPROVED, platform=plat)
         if approved_posts and plat == Platform.PINTEREST:
-            if config.PINTEREST_ACCESS_TOKEN and config.PINTEREST_BOARD_ID:
-                publisher = PinterestPublisher(config.PINTEREST_ACCESS_TOKEN, config.PINTEREST_BOARD_ID)
+            token, board_id = get_pinterest_credentials()
+            if token and board_id:
+                publisher = PinterestPublisher(token, board_id)
                 success = 0
                 for post in approved_posts:
                     try:
@@ -196,7 +205,7 @@ def dashboard():
         published=published[-10:],
         task_status=task_status,
         shop_username=settings.get("shop_username", ""),
-        has_pinterest=bool(config.PINTEREST_ACCESS_TOKEN),
+        has_pinterest=bool(get_pinterest_credentials()[0]),
         has_instagram=bool(config.INSTAGRAM_ACCESS_TOKEN),
         settings=settings,
         scheduler=scheduler_state,
@@ -347,12 +356,13 @@ def publish():
             return
 
         if plat == Platform.PINTEREST:
-            if not config.PINTEREST_ACCESS_TOKEN or not config.PINTEREST_BOARD_ID:
-                task_status["message"] = "Pinterest not configured. Run OAuth first."
+            token, board_id = get_pinterest_credentials()
+            if not token or not board_id:
+                task_status["message"] = "Pinterest not configured. Add your Access Token and Board ID in Settings."
                 task_status["running"] = False
                 db.close()
                 return
-            publisher = PinterestPublisher(config.PINTEREST_ACCESS_TOKEN, config.PINTEREST_BOARD_ID)
+            publisher = PinterestPublisher(token, board_id)
         else:
             task_status["message"] = "Instagram publishing not yet configured."
             task_status["running"] = False
@@ -391,6 +401,8 @@ def settings_page():
 def save_settings_route():
     settings = {
         "shop_username": request.form.get("shop_username", "").strip(),
+        "pinterest_access_token": request.form.get("pinterest_access_token", "").strip(),
+        "pinterest_board_id": request.form.get("pinterest_board_id", "").strip(),
         "auto_post_enabled": request.form.get("auto_post_enabled") == "on",
         "auto_post_interval_hours": int(request.form.get("auto_post_interval_hours", 6)),
         "auto_post_platform": request.form.get("auto_post_platform", "pinterest"),
