@@ -150,6 +150,42 @@
         <button type="submit" class="btn btn-blue">Save Settings</button>
     </form>
 
+    <!-- Danger Zone -->
+    <div class="card" style="margin-top: 24px; border-color: var(--danger, #dc2626);">
+        <h2 style="color: var(--danger, #dc2626);">Danger Zone</h2>
+        <div style="display: flex; flex-direction: column; gap: 12px;">
+            <div>
+                <div style="font-size: 0.9rem; font-weight: 500;">Reject All Drafts</div>
+                <div class="hint">Permanently delete all draft posts. Published posts are not affected.</div>
+                <form action="/reject-all-drafts" method="post" onsubmit="return validateConfirm(this, 'reject all drafts');" style="margin-top: 8px; display: flex; gap: 8px; align-items: center;">
+                    <input type="text" name="confirm_text" placeholder="Type &quot;reject all drafts&quot; to confirm" style="flex: 1; max-width: 300px;">
+                    <button class="btn btn-sm btn-red" type="submit">Reject All Drafts</button>
+                </form>
+            </div>
+            <hr style="border: none; border-top: 1px solid var(--border);">
+            <div>
+                <div style="font-size: 0.9rem; font-weight: 500;">Clear All Listings &amp; Drafts</div>
+                <div class="hint">Delete all scraped listings and unpublished posts. Published post history is kept.</div>
+                <form action="/clear-all-listings" method="post" onsubmit="return validateConfirm(this, 'clear everything');" style="margin-top: 8px; display: flex; gap: 8px; align-items: center;">
+                    <input type="text" name="confirm_text" placeholder="Type &quot;clear everything&quot; to confirm" style="flex: 1; max-width: 300px;">
+                    <button class="btn btn-sm btn-red" type="submit">Clear Everything</button>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        function validateConfirm(form, expected) {
+            const input = form.querySelector('input[name="confirm_text"]');
+            if (input.value.trim().toLowerCase() !== expected) {
+                alert('Please type "' + expected + '" exactly to confirm.');
+                input.focus();
+                return false;
+            }
+            return true;
+        }
+    </script>
+
     <script>
         (function() {
             const saved = localStorage.getItem('theme') || 'light';

@@ -428,6 +428,30 @@ def clear_status():
     return redirect(url_for("dashboard"))
 
 
+@app.route("/reject-all-drafts", methods=["POST"])
+def reject_all_drafts():
+    if request.form.get("confirm_text", "").strip().lower() != "reject all drafts":
+        task_status["message"] = "Confirmation text didn't match. No drafts were deleted."
+        return redirect(url_for("settings_page"))
+    db = get_db()
+    db.reject_all_drafts()
+    db.close()
+    task_status["message"] = "All drafts rejected."
+    return redirect(url_for("settings_page"))
+
+
+@app.route("/clear-all-listings", methods=["POST"])
+def clear_all_listings():
+    if request.form.get("confirm_text", "").strip().lower() != "clear everything":
+        task_status["message"] = "Confirmation text didn't match. Nothing was deleted."
+        return redirect(url_for("settings_page"))
+    db = get_db()
+    db.clear_all_listings()
+    db.close()
+    task_status["message"] = "All listings and unpublished posts cleared."
+    return redirect(url_for("settings_page"))
+
+
 # Initialize scheduler on startup
 def init_scheduler():
     settings = load_settings()

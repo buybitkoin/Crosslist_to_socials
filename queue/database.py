@@ -172,6 +172,15 @@ class Database:
         self.conn.execute("DELETE FROM posts WHERE id = ?", (post_id,))
         self.conn.commit()
 
+    def reject_all_drafts(self):
+        self.conn.execute("DELETE FROM posts WHERE status = ?", (PostStatus.DRAFT.value,))
+        self.conn.commit()
+
+    def clear_all_listings(self):
+        self.conn.execute("DELETE FROM posts WHERE status IN (?, ?)", (PostStatus.DRAFT.value, PostStatus.APPROVED.value))
+        self.conn.execute("DELETE FROM listings")
+        self.conn.commit()
+
     def update_caption(self, post_id: int, caption: str):
         self.conn.execute(
             "UPDATE posts SET caption = ?, updated_at = ? WHERE id = ?",
