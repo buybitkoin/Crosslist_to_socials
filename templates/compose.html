@@ -294,7 +294,7 @@
                 const data = await response.json();
                 if (data.caption) {
                     document.getElementById('caption').value = data.caption;
-                    status.textContent = 'Caption generated!';
+                    status.textContent = data.warning || 'Caption generated!';
                 } else {
                     status.textContent = 'Error: ' + (data.error || 'Unknown error');
                 }

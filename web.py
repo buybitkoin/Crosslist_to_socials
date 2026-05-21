@@ -529,22 +529,26 @@ def compose_generate_caption():
     plat = Platform(platform)
     settings = load_settings()
 
+    has_ai = use_ai and config.ANTHROPIC_API_KEY and settings.get("use_ai_captions", True)
+    no_key_warning = ""
+
+    if use_ai and not config.ANTHROPIC_API_KEY:
+        no_key_warning = " (No API key set — used quick caption instead. Add ANTHROPIC_API_KEY to .env for AI captions.)"
+
     if len(listings) == 1:
-        # Single listing — use regular generator
-        if use_ai and config.ANTHROPIC_API_KEY and settings.get("use_ai_captions", True):
+        if has_ai:
             generator = CaptionGenerator(config.ANTHROPIC_API_KEY)
             caption = generator.generate(listings[0], plat)
         else:
             caption = CaptionGenerator("")._fallback_caption(listings[0], plat)
     else:
-        # Multi listing
-        if use_ai and config.ANTHROPIC_API_KEY and settings.get("use_ai_captions", True):
+        if has_ai:
             generator = CaptionGenerator(config.ANTHROPIC_API_KEY)
             caption = generator.generate_multi(listings, plat)
         else:
             caption = CaptionGenerator("")._fallback_multi_caption(listings, plat)
 
-    return jsonify({"caption": caption})
+    return jsonify({"caption": caption, "warning": no_key_warning})
 
 
 @app.route("/compose/save", methods=["POST"])
