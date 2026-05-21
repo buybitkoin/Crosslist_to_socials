@@ -11,7 +11,7 @@ class PinterestOAuth:
     AUTH_URL = "https://www.pinterest.com/oauth/"
     TOKEN_URL = "https://api.pinterest.com/v5/oauth/token"
     REDIRECT_URI = "http://localhost:8000/callback"
-    SCOPES = "pins:read,pins:write,boards:read,boards:write"
+    SCOPES = "pins:read,pins:write,boards:read,boards:write,user_accounts:read"
 
     def __init__(self, app_id: str, app_secret: str):
         self.app_id = app_id

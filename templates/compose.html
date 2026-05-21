@@ -1,0 +1,358 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Compose Post - Social Media Agent</title>
+    <style>
+        :root {
+            --bg: #f5f5f5;
+            --card-bg: #ffffff;
+            --text: #333333;
+            --text-muted: #666666;
+            --border: #e5e5e5;
+            --hover: #f8fafc;
+            --accent: #2563eb;
+            --success: #16a34a;
+            --danger: #dc2626;
+            --input-bg: #ffffff;
+            --selected-bg: #dbeafe;
+            --selected-border: #2563eb;
+        }
+        [data-theme="dark"] {
+            --bg: #1a1a2e;
+            --card-bg: #16213e;
+            --text: #e0e0e0;
+            --text-muted: #a0a0a0;
+            --border: #2a2a4a;
+            --hover: #1e2a4a;
+            --accent: #60a5fa;
+            --success: #4ade80;
+            --danger: #f87171;
+            --input-bg: #1e2a4a;
+            --selected-bg: #1e3a5f;
+            --selected-border: #60a5fa;
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: var(--bg); color: var(--text); padding: 20px; max-width: 1200px; margin: 0 auto; transition: background 0.3s, color 0.3s; }
+
+        .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
+        .header h1 { font-size: 1.5rem; }
+        .back-link { color: var(--accent); text-decoration: none; font-size: 0.9rem; }
+        .back-link:hover { text-decoration: underline; }
+
+        .compose-layout { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+        @media (max-width: 768px) { .compose-layout { grid-template-columns: 1fr; } }
+
+        .card { background: var(--card-bg); border: 1px solid var(--border); border-radius: 8px; padding: 20px; }
+        .card h2 { font-size: 1rem; margin-bottom: 12px; }
+
+        /* Listing picker */
+        .listing-search { width: 100%; padding: 10px 12px; border: 1px solid var(--border); border-radius: 6px; font-size: 0.9rem; background: var(--input-bg); color: var(--text); margin-bottom: 12px; }
+        .listing-search:focus { outline: none; border-color: var(--accent); }
+
+        .listing-grid { display: flex; flex-direction: column; gap: 6px; max-height: 500px; overflow-y: auto; }
+
+        .listing-item { display: flex; align-items: center; gap: 10px; padding: 8px; border: 2px solid var(--border); border-radius: 6px; cursor: pointer; transition: all 0.15s; }
+        .listing-item:hover { background: var(--hover); }
+        .listing-item.selected { background: var(--selected-bg); border-color: var(--selected-border); }
+        .listing-item img { width: 48px; height: 48px; object-fit: cover; border-radius: 4px; flex-shrink: 0; }
+        .listing-item .no-img { width: 48px; height: 48px; background: var(--border); border-radius: 4px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; font-size: 0.7rem; color: var(--text-muted); }
+        .listing-item-info { flex: 1; min-width: 0; }
+        .listing-item-title { font-size: 0.85rem; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .listing-item-meta { font-size: 0.75rem; color: var(--text-muted); }
+        .listing-item .order-badge { background: var(--accent); color: white; width: 22px; height: 22px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 0.75rem; font-weight: 600; flex-shrink: 0; }
+
+        .selected-count { font-size: 0.85rem; color: var(--text-muted); margin-bottom: 8px; }
+
+        /* Preview / editor */
+        .preview-section { position: sticky; top: 20px; }
+
+        .selected-images { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 16px; min-height: 80px; border: 2px dashed var(--border); border-radius: 8px; padding: 12px; align-items: center; justify-content: center; }
+        .selected-images.has-images { border-style: solid; justify-content: flex-start; }
+        .selected-images .empty-msg { color: var(--text-muted); font-size: 0.85rem; }
+        .selected-images img { width: 80px; height: 80px; object-fit: cover; border-radius: 6px; }
+        .selected-images .img-wrapper { position: relative; }
+        .selected-images .img-remove { position: absolute; top: -6px; right: -6px; background: var(--danger); color: white; border: none; border-radius: 50%; width: 20px; height: 20px; font-size: 0.7rem; cursor: pointer; display: flex; align-items: center; justify-content: center; }
+
+        .form-group { margin-bottom: 16px; }
+        .form-group label { display: block; font-size: 0.85rem; font-weight: 500; margin-bottom: 6px; }
+        .form-group .hint { font-size: 0.8rem; color: var(--text-muted); margin-top: 4px; }
+
+        select, textarea {
+            width: 100%;
+            padding: 10px 12px;
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            font-size: 0.9rem;
+            background: var(--input-bg);
+            color: var(--text);
+        }
+        select:focus, textarea:focus { outline: none; border-color: var(--accent); }
+        textarea { min-height: 120px; resize: vertical; font-family: inherit; }
+
+        .btn { padding: 10px 18px; border: none; border-radius: 6px; font-size: 0.9rem; cursor: pointer; font-weight: 500; transition: opacity 0.2s; }
+        .btn:hover { opacity: 0.85; }
+        .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+        .btn-blue { background: var(--accent); color: white; }
+        .btn-green { background: var(--success); color: white; }
+        .btn-gray { background: #6b7280; color: white; }
+
+        .btn-row { display: flex; gap: 8px; flex-wrap: wrap; }
+
+        .generating { color: var(--accent); font-size: 0.85rem; margin-top: 8px; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>Compose Post</h1>
+        <a href="/" class="back-link">&larr; Back to Dashboard</a>
+    </div>
+
+    <div class="compose-layout">
+        <!-- Left: Listing picker -->
+        <div class="card">
+            <h2>Select Listings</h2>
+            <input type="text" class="listing-search" placeholder="Search listings..." id="searchInput" oninput="filterListings()">
+            <div class="selected-count" id="selectedCount">0 selected</div>
+            <div class="listing-grid" id="listingGrid">
+                {% for listing in listings %}
+                <div class="listing-item" data-id="{{ listing.id }}" data-title="{{ listing.title|lower }}" onclick="toggleListing(this)">
+                    {% if listing.images %}
+                    <img src="{{ listing.images[0] }}" alt="" loading="lazy">
+                    {% else %}
+                    <div class="no-img">No img</div>
+                    {% endif %}
+                    <div class="listing-item-info">
+                        <div class="listing-item-title">{{ listing.title[:60] }}</div>
+                        <div class="listing-item-meta">
+                            {{ listing.currency }}{{ "%.2f"|format(listing.price) }}
+                            {% if listing.size %} &middot; {{ listing.size }}{% endif %}
+                            {% if listing.brand %} &middot; {{ listing.brand }}{% endif %}
+                        </div>
+                    </div>
+                </div>
+                {% endfor %}
+                {% if not listings %}
+                <div style="text-align: center; padding: 20px; color: var(--text-muted);">No listings found. Scrape some first.</div>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- Right: Preview and editor -->
+        <div class="card preview-section">
+            <h2>Post Preview</h2>
+
+            <!-- Selected images -->
+            <div class="selected-images" id="selectedImages">
+                <span class="empty-msg">Select listings to see images here</span>
+            </div>
+
+            <!-- Platform -->
+            <div class="form-group">
+                <label for="platform">Platform</label>
+                <select id="platform">
+                    <option value="pinterest">Pinterest</option>
+                    <option value="instagram">Instagram</option>
+                </select>
+            </div>
+
+            <!-- Caption -->
+            <div class="form-group">
+                <label for="caption">Caption</label>
+                <textarea id="caption" placeholder="Write a caption or generate one with AI..."></textarea>
+                <div class="btn-row" style="margin-top: 8px;">
+                    <button class="btn btn-blue" onclick="generateCaption()" id="generateBtn">Generate with AI</button>
+                    <button class="btn btn-gray" onclick="generateFallback()" id="fallbackBtn">Quick Caption</button>
+                </div>
+                <div class="generating" id="genStatus" style="display: none;"></div>
+            </div>
+
+            <!-- Save -->
+            <div class="btn-row">
+                <button class="btn btn-green" onclick="savePost('draft')" id="saveDraftBtn" disabled>Save as Draft</button>
+                <button class="btn btn-blue" onclick="savePost('approved')" id="saveApprovedBtn" disabled>Save & Approve</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let selectedListings = []; // [{id, title, image, price, currency, size, brand}]
+
+        function toggleListing(el) {
+            const id = el.dataset.id;
+            const idx = selectedListings.findIndex(l => l.id === id);
+
+            if (idx >= 0) {
+                // Deselect
+                selectedListings.splice(idx, 1);
+                el.classList.remove('selected');
+                const badge = el.querySelector('.order-badge');
+                if (badge) badge.remove();
+            } else {
+                // Select
+                const img = el.querySelector('img');
+                const meta = el.querySelector('.listing-item-meta').textContent.trim();
+                selectedListings.push({
+                    id: id,
+                    title: el.querySelector('.listing-item-title').textContent.trim(),
+                    image: img ? img.src : '',
+                    meta: meta
+                });
+                el.classList.add('selected');
+            }
+
+            updateBadges();
+            updatePreview();
+        }
+
+        function updateBadges() {
+            // Remove all existing badges
+            document.querySelectorAll('.order-badge').forEach(b => b.remove());
+            // Add badges in order
+            selectedListings.forEach((listing, i) => {
+                const el = document.querySelector(`.listing-item[data-id="${listing.id}"]`);
+                if (el) {
+                    const badge = document.createElement('div');
+                    badge.className = 'order-badge';
+                    badge.textContent = i + 1;
+                    el.appendChild(badge);
+                }
+            });
+        }
+
+        function updatePreview() {
+            const container = document.getElementById('selectedImages');
+            const count = document.getElementById('selectedCount');
+            const saveDraft = document.getElementById('saveDraftBtn');
+            const saveApproved = document.getElementById('saveApprovedBtn');
+
+            count.textContent = `${selectedListings.length} selected`;
+            saveDraft.disabled = selectedListings.length === 0;
+            saveApproved.disabled = selectedListings.length === 0;
+
+            if (selectedListings.length === 0) {
+                container.innerHTML = '<span class="empty-msg">Select listings to see images here</span>';
+                container.classList.remove('has-images');
+                return;
+            }
+
+            container.classList.add('has-images');
+            container.innerHTML = selectedListings
+                .filter(l => l.image)
+                .map((l, i) => `
+                    <div class="img-wrapper">
+                        <img src="${l.image}" alt="">
+                        <button class="img-remove" onclick="event.stopPropagation(); removeListing('${l.id}')" title="Remove">&times;</button>
+                    </div>
+                `).join('');
+
+            if (container.innerHTML === '') {
+                container.innerHTML = '<span class="empty-msg">Selected listings have no images</span>';
+                container.classList.remove('has-images');
+            }
+        }
+
+        function removeListing(id) {
+            const el = document.querySelector(`.listing-item[data-id="${id}"]`);
+            if (el) {
+                el.classList.remove('selected');
+                const badge = el.querySelector('.order-badge');
+                if (badge) badge.remove();
+            }
+            selectedListings = selectedListings.filter(l => l.id !== id);
+            updateBadges();
+            updatePreview();
+        }
+
+        function filterListings() {
+            const query = document.getElementById('searchInput').value.toLowerCase();
+            document.querySelectorAll('.listing-item').forEach(el => {
+                const title = el.dataset.title;
+                el.style.display = title.includes(query) ? '' : 'none';
+            });
+        }
+
+        async function generateCaption() {
+            if (selectedListings.length === 0) return;
+            const btn = document.getElementById('generateBtn');
+            const status = document.getElementById('genStatus');
+            btn.disabled = true;
+            status.style.display = 'block';
+            status.textContent = 'Generating caption with AI...';
+
+            try {
+                const response = await fetch('/compose/generate-caption', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({
+                        listing_ids: selectedListings.map(l => l.id),
+                        platform: document.getElementById('platform').value
+                    })
+                });
+                const data = await response.json();
+                if (data.caption) {
+                    document.getElementById('caption').value = data.caption;
+                    status.textContent = 'Caption generated!';
+                } else {
+                    status.textContent = 'Error: ' + (data.error || 'Unknown error');
+                }
+            } catch (e) {
+                status.textContent = 'Error: ' + e.message;
+            }
+            btn.disabled = false;
+            setTimeout(() => { status.style.display = 'none'; }, 3000);
+        }
+
+        async function generateFallback() {
+            if (selectedListings.length === 0) return;
+            const response = await fetch('/compose/generate-caption', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({
+                    listing_ids: selectedListings.map(l => l.id),
+                    platform: document.getElementById('platform').value,
+                    use_ai: false
+                })
+            });
+            const data = await response.json();
+            if (data.caption) {
+                document.getElementById('caption').value = data.caption;
+            }
+        }
+
+        async function savePost(status) {
+            if (selectedListings.length === 0) return;
+            const caption = document.getElementById('caption').value.trim();
+            if (!caption) {
+                alert('Please write or generate a caption first.');
+                return;
+            }
+
+            const response = await fetch('/compose/save', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({
+                    listing_ids: selectedListings.map(l => l.id),
+                    platform: document.getElementById('platform').value,
+                    caption: caption,
+                    status: status
+                })
+            });
+            const data = await response.json();
+            if (data.success) {
+                window.location.href = '/';
+            } else {
+                alert('Error: ' + (data.error || 'Unknown error'));
+            }
+        }
+
+        // Load theme
+        (function() {
+            const saved = localStorage.getItem('theme') || 'light';
+            document.documentElement.setAttribute('data-theme', saved);
+        })();
+    </script>
+</body>
+</html>

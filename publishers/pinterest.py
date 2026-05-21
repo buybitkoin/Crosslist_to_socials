@@ -30,6 +30,7 @@ class PinterestPublisher(Publisher):
             "media_source": {
                 "source_type": "image_url",
                 "url": image_url,
+                "is_standard": True,
             },
             "alt_text": post.caption[:500],
         }

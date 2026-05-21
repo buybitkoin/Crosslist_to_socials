@@ -7,12 +7,13 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent))
 
-from flask import Flask, render_template, request, jsonify, redirect, url_for
+from flask import Flask, render_template, request, jsonify, redirect, url_for, abort
 
 import config
 from queue.database import Database
 from queue.models import Post, PostStatus, Platform
 from scraper.depop_scraper import DepopScraper
+from scraper.models import DepopListing
 from captions.generator import CaptionGenerator
 from publishers.pinterest import PinterestPublisher
 
@@ -496,6 +497,100 @@ def clear_all_listings():
     db.close()
     task_status["message"] = "All listings and unpublished posts cleared."
     return redirect(url_for("settings_page"))
+
+
+# --- Compose (Multi-listing post editor) ---
+
+@app.route("/compose")
+def compose():
+    db = get_db()
+    listings = db.get_all_listings()
+    db.close()
+    return render_template("compose.html", listings=listings)
+
+
+@app.route("/compose/generate-caption", methods=["POST"])
+def compose_generate_caption():
+    data = request.get_json()
+    listing_ids = data.get("listing_ids", [])
+    platform = data.get("platform", "pinterest")
+    use_ai = data.get("use_ai", True)
+
+    if not listing_ids:
+        return jsonify({"error": "No listings selected"}), 400
+
+    db = get_db()
+    listings = db.get_listings_by_ids(listing_ids)
+    db.close()
+
+    if not listings:
+        return jsonify({"error": "Listings not found"}), 404
+
+    plat = Platform(platform)
+    settings = load_settings()
+
+    if len(listings) == 1:
+        # Single listing — use regular generator
+        if use_ai and config.ANTHROPIC_API_KEY and settings.get("use_ai_captions", True):
+            generator = CaptionGenerator(config.ANTHROPIC_API_KEY)
+            caption = generator.generate(listings[0], plat)
+        else:
+            caption = CaptionGenerator("")._fallback_caption(listings[0], plat)
+    else:
+        # Multi listing
+        if use_ai and config.ANTHROPIC_API_KEY and settings.get("use_ai_captions", True):
+            generator = CaptionGenerator(config.ANTHROPIC_API_KEY)
+            caption = generator.generate_multi(listings, plat)
+        else:
+            caption = CaptionGenerator("")._fallback_multi_caption(listings, plat)
+
+    return jsonify({"caption": caption})
+
+
+@app.route("/compose/save", methods=["POST"])
+def compose_save():
+    data = request.get_json()
+    listing_ids = data.get("listing_ids", [])
+    platform = data.get("platform", "pinterest")
+    caption = data.get("caption", "").strip()
+    status = data.get("status", "draft")
+
+    if not listing_ids or not caption:
+        return jsonify({"error": "Missing required fields"}), 400
+
+    db = get_db()
+    listings = db.get_listings_by_ids(listing_ids)
+
+    if not listings:
+        db.close()
+        return jsonify({"error": "Listings not found"}), 404
+
+    # Collect all images from selected listings
+    all_images = []
+    for listing in listings:
+        all_images.extend(listing.images)
+
+    # Use first listing's URL as destination, or empty
+    destination = listings[0].url if listings[0].url else ""
+
+    # Store all listing IDs joined with comma for the listing_id field
+    combined_listing_id = ",".join(listing_ids)
+
+    plat = Platform(platform)
+    post_status = PostStatus.APPROVED if status == "approved" else PostStatus.DRAFT
+
+    post = Post(
+        listing_id=combined_listing_id,
+        platform=plat,
+        status=post_status,
+        caption=caption,
+        image_urls=all_images,
+        destination_url=destination,
+    )
+    db.add_post(post)
+    db.close()
+
+    return jsonify({"success": True})
 
 
 # Initialize scheduler on startup

@@ -104,6 +104,50 @@ class Database:
             scraped_at=row["scraped_at"],
         )
 
+    def get_all_listings(self) -> list[DepopListing]:
+        rows = self.conn.execute("SELECT * FROM listings ORDER BY scraped_at DESC").fetchall()
+        return [
+            DepopListing(
+                id=r["id"],
+                title=r["title"],
+                description=r["description"] or "",
+                price=r["price"],
+                currency=r["currency"],
+                images=json.loads(r["images"]),
+                url=r["url"],
+                brand=r["brand"],
+                size=r["size"],
+                condition=r["condition"],
+                scraped_at=r["scraped_at"],
+            )
+            for r in rows
+        ]
+
+    def get_listings_by_ids(self, listing_ids: list[str]) -> list[DepopListing]:
+        if not listing_ids:
+            return []
+        placeholders = ",".join(["?"] * len(listing_ids))
+        rows = self.conn.execute(
+            f"SELECT * FROM listings WHERE id IN ({placeholders})", listing_ids
+        ).fetchall()
+        # Preserve the order of listing_ids
+        lookup = {}
+        for r in rows:
+            lookup[r["id"]] = DepopListing(
+                id=r["id"],
+                title=r["title"],
+                description=r["description"] or "",
+                price=r["price"],
+                currency=r["currency"],
+                images=json.loads(r["images"]),
+                url=r["url"],
+                brand=r["brand"],
+                size=r["size"],
+                condition=r["condition"],
+                scraped_at=r["scraped_at"],
+            )
+        return [lookup[lid] for lid in listing_ids if lid in lookup]
+
     def get_unprocessed_listings(self, platform: Platform) -> list[DepopListing]:
         """Get listings that don't have a post for the given platform yet."""
         rows = self.conn.execute(
