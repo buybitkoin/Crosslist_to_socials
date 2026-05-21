@@ -102,6 +102,14 @@
 
         .empty { text-align: center; padding: 40px; color: var(--text-muted); }
 
+        .progress-container { background: var(--card-bg); border: 1px solid var(--border); border-radius: 8px; padding: 16px 20px; margin-bottom: 16px; }
+        .progress-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+        .progress-step { font-weight: 600; font-size: 0.9rem; }
+        .progress-pct { font-size: 0.85rem; color: var(--text-muted); }
+        .progress-bar-track { height: 8px; background: var(--border); border-radius: 4px; overflow: hidden; margin-bottom: 8px; }
+        .progress-bar-fill { height: 100%; background: var(--accent); border-radius: 4px; transition: width 0.4s ease; }
+        .progress-message { font-size: 0.85rem; color: var(--text-muted); }
+
         /* Dark mode toggle */
         .theme-toggle { background: var(--card-bg); border: 1px solid var(--border); border-radius: 6px; padding: 8px 12px; cursor: pointer; font-size: 1.1rem; line-height: 1; }
         .theme-toggle:hover { background: var(--hover); }
@@ -127,19 +135,27 @@
         </div>
     </div>
 
-    <!-- Status Alert -->
+    <!-- Status / Progress -->
     {% if task_status.message %}
+    {% if task_status.running %}
+    <div class="progress-container">
+        <div class="progress-header">
+            <span class="progress-step">{{ task_status.step or '' }}</span>
+            <span class="progress-pct">{{ task_status.progress }}%</span>
+        </div>
+        <div class="progress-bar-track">
+            <div class="progress-bar-fill" style="width: {{ task_status.progress }}%"></div>
+        </div>
+        <div class="progress-message">{{ task_status.message }}</div>
+    </div>
+    {% else %}
     <div class="alert {% if 'Error' in task_status.message or 'error' in task_status.message %}alert-error{% elif 'Done' in task_status.message or 'done' in task_status.message %}alert-success{% else %}alert-info{% endif %}">
-        <span>
-            {% if task_status.running %}&#9203;{% endif %}
-            {{ task_status.message }}
-        </span>
-        {% if not task_status.running %}
+        <span>{{ task_status.message }}</span>
         <form action="/clear-status" method="post">
             <button class="btn btn-sm btn-gray" type="submit">Dismiss</button>
         </form>
-        {% endif %}
     </div>
+    {% endif %}
     {% endif %}
 
     <!-- Scheduler Status Bar -->

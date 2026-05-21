@@ -19,7 +19,7 @@ from publishers.pinterest import PinterestPublisher
 app = Flask(__name__)
 
 # Track background task status
-task_status = {"running": False, "message": "", "type": ""}
+task_status = {"running": False, "message": "", "type": "", "progress": 0, "step": ""}
 
 # Scheduler state
 scheduler_state = {"enabled": False, "interval_hours": 6, "next_run": None, "timer": None}
@@ -220,18 +220,27 @@ def scrape():
     def run_scrape():
         task_status["running"] = True
         task_status["type"] = "scrape"
-        task_status["message"] = "Scraping listings from Crosslist..."
+        task_status["step"] = "Scraping Listings"
+        task_status["progress"] = 10
+        task_status["message"] = "Opening Crosslist and loading listings..."
         try:
             scraper = DepopScraper()
+            task_status["progress"] = 30
+            task_status["message"] = "Reading listings from Crosslist dashboard..."
             listings = scraper.scrape_shop()
             scraper.close()
 
+            task_status["progress"] = 70
+            task_status["message"] = f"Found {len(listings)} listings. Saving to database..."
+
             db = get_db()
             new_count = 0
-            for listing in listings:
+            for i, listing in enumerate(listings):
                 if db.save_listing(listing):
                     new_count += 1
+                task_status["progress"] = 70 + int(30 * (i + 1) / max(len(listings), 1))
             db.close()
+            task_status["progress"] = 100
             task_status["message"] = f"Done! Found {len(listings)} listings, {new_count} new."
         except Exception as e:
             task_status["message"] = f"Error: {e}"
@@ -254,13 +263,16 @@ def generate():
     def run_generate():
         task_status["running"] = True
         task_status["type"] = "generate"
+        task_status["step"] = "Generating Captions"
+        task_status["progress"] = 5
         plat = Platform(platform)
 
         db = get_db()
         listings = db.get_unprocessed_listings(plat)
-        task_status["message"] = f"Generating {platform} captions for {len(listings)} listings..."
+        task_status["message"] = f"Found {len(listings)} listings to generate {platform} captions for..."
 
         if not listings:
+            task_status["progress"] = 100
             task_status["message"] = "No unprocessed listings. Scrape first."
             task_status["running"] = False
             db.close()
@@ -271,7 +283,10 @@ def generate():
             generator = CaptionGenerator(config.ANTHROPIC_API_KEY)
 
         try:
-            for listing in listings:
+            for i, listing in enumerate(listings):
+                task_status["progress"] = 5 + int(95 * i / len(listings))
+                task_status["message"] = f"Generating caption {i + 1}/{len(listings)}: {listing.title[:50]}..."
+
                 if generator:
                     caption = generator.generate(listing, plat)
                 else:
@@ -286,6 +301,7 @@ def generate():
                 )
                 db.add_post(post)
 
+            task_status["progress"] = 100
             task_status["message"] = f"Done! Generated {len(listings)} draft posts."
         except Exception as e:
             task_status["message"] = f"Error: {e}"
@@ -351,13 +367,16 @@ def publish():
     def run_publish():
         task_status["running"] = True
         task_status["type"] = "publish"
+        task_status["step"] = f"Publishing to {platform.title()}"
+        task_status["progress"] = 5
         plat = Platform(platform)
 
         db = get_db()
         posts = db.get_posts(status=PostStatus.APPROVED, platform=plat)
-        task_status["message"] = f"Publishing {len(posts)} posts to {platform}..."
+        task_status["message"] = f"Found {len(posts)} approved posts to publish..."
 
         if not posts:
+            task_status["progress"] = 100
             task_status["message"] = "No approved posts to publish."
             task_status["running"] = False
             db.close()
@@ -366,12 +385,14 @@ def publish():
         if plat == Platform.PINTEREST:
             token, board_id = get_pinterest_credentials()
             if not token or not board_id:
+                task_status["progress"] = 100
                 task_status["message"] = "Pinterest not configured. Add your Access Token and Board ID in Settings."
                 task_status["running"] = False
                 db.close()
                 return
             publisher = PinterestPublisher(token, board_id)
         else:
+            task_status["progress"] = 100
             task_status["message"] = "Instagram publishing not yet configured."
             task_status["running"] = False
             db.close()
@@ -379,7 +400,9 @@ def publish():
 
         try:
             success = 0
-            for post in posts:
+            for i, post in enumerate(posts):
+                task_status["progress"] = 5 + int(95 * i / len(posts))
+                task_status["message"] = f"Publishing post {i + 1}/{len(posts)}: {post.caption[:50]}..."
                 try:
                     platform_id = publisher.publish(post)
                     db.mark_published(post.id, platform_id)
@@ -387,6 +410,7 @@ def publish():
                 except Exception as e:
                     db.mark_failed(post.id, str(e))
 
+            task_status["progress"] = 100
             task_status["message"] = f"Done! Published {success}/{len(posts)} posts."
             publisher.close()
         except Exception as e:
@@ -445,6 +469,8 @@ def run_now():
 def clear_status():
     task_status["message"] = ""
     task_status["type"] = ""
+    task_status["progress"] = 0
+    task_status["step"] = ""
     return redirect(url_for("dashboard"))
 
 
