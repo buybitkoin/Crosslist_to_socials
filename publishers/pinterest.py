@@ -38,17 +38,22 @@ class PinterestPublisher(Publisher):
         }
 
         response = self.client.post(f"{self.api_base}/pins", json=payload)
-        response.raise_for_status()
+        if response.status_code >= 400:
+            raise Exception(f"Pinterest API error {response.status_code}: {response.text[:500]}")
         data = response.json()
         return data["id"]
 
-    def validate_credentials(self) -> bool:
-        """Check if the access token is valid by fetching user info."""
+    def validate_credentials(self) -> dict:
+        """Check if the access token is valid by fetching user info. Returns status details."""
         try:
             response = self.client.get(f"{self.api_base}/user_account")
-            return response.status_code == 200
-        except Exception:
-            return False
+            if response.status_code == 200:
+                data = response.json()
+                return {"valid": True, "username": data.get("username", ""), "message": "Credentials are valid!"}
+            else:
+                return {"valid": False, "message": f"HTTP {response.status_code}: {response.text[:300]}"}
+        except Exception as e:
+            return {"valid": False, "message": str(e)}
 
     def get_boards(self) -> list[dict]:
         """List all boards for the authenticated user."""

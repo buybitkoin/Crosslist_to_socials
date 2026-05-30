@@ -485,12 +485,11 @@ def pinterest_test():
 
     if action == "test":
         # Test credentials
-        valid = publisher.validate_credentials()
+        result = publisher.validate_credentials()
         publisher.close()
-        if valid:
-            return jsonify({"success": True, "message": "Credentials are valid!"})
-        else:
-            return jsonify({"success": False, "message": "Invalid credentials. Token may be expired or have wrong scopes."})
+        env = "SANDBOX" if sandbox else "PRODUCTION"
+        result["message"] = f"[{env}] {result['message']}"
+        return jsonify({"success": result["valid"], "message": result["message"]})
 
     elif action == "list_boards":
         try:
