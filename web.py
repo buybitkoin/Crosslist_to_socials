@@ -338,6 +338,14 @@ def unapprove(post_id: int):
     return redirect(url_for("dashboard"))
 
 
+@app.route("/clear-error/<int:post_id>", methods=["POST"])
+def clear_error(post_id: int):
+    db = get_db()
+    db.clear_post_error(post_id)
+    db.close()
+    return redirect(url_for("dashboard"))
+
+
 @app.route("/approve-all", methods=["POST"])
 def approve_all():
     db = get_db()
@@ -401,6 +409,7 @@ def publish():
 
         try:
             success = 0
+            errors = []
             for i, post in enumerate(posts):
                 task_status["progress"] = 5 + int(95 * i / len(posts))
                 task_status["message"] = f"Publishing post {i + 1}/{len(posts)}: {post.caption[:50]}..."
@@ -409,10 +418,15 @@ def publish():
                     db.mark_published(post.id, platform_id)
                     success += 1
                 except Exception as e:
-                    db.mark_failed(post.id, str(e))
+                    error_msg = str(e)
+                    db.mark_failed(post.id, error_msg)
+                    errors.append(error_msg)
 
             task_status["progress"] = 100
-            task_status["message"] = f"Done! Published {success}/{len(posts)} posts."
+            if success == len(posts):
+                task_status["message"] = f"Done! Published {success}/{len(posts)} posts."
+            elif errors:
+                task_status["message"] = f"Done! Published {success}/{len(posts)} posts. Error: {errors[0][:150]}"
             publisher.close()
         except Exception as e:
             task_status["message"] = f"Error: {e}"
@@ -497,6 +511,16 @@ def clear_all_listings():
     db.close()
     task_status["message"] = "All listings and unpublished posts cleared."
     return redirect(url_for("settings_page"))
+
+
+# --- Error Log ---
+
+@app.route("/errors")
+def error_log():
+    db = get_db()
+    errors = db.get_error_log()
+    db.close()
+    return render_template("errors.html", errors=errors)
 
 
 # --- Compose (Multi-listing post editor) ---

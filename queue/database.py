@@ -253,11 +253,56 @@ class Database:
         self.conn.commit()
 
     def mark_failed(self, post_id: int, error: str):
+        """Mark a post as failed but keep it in approved status so it can be retried."""
+        now = datetime.now().isoformat()
         self.conn.execute(
-            "UPDATE posts SET status = ?, error_message = ?, updated_at = ? WHERE id = ?",
-            (PostStatus.FAILED.value, error, datetime.now().isoformat(), post_id),
+            "UPDATE posts SET error_message = ?, updated_at = ? WHERE id = ?",
+            (error, now, post_id),
+        )
+        # Log the failure
+        self.conn.execute(
+            """INSERT INTO publish_log (post_id, platform, platform_post_id, published_at, response_data)
+               SELECT ?, platform, '', ?, ? FROM posts WHERE id = ?""",
+            (post_id, now, json.dumps({"error": error}), post_id),
         )
         self.conn.commit()
+
+    def clear_post_error(self, post_id: int):
+        self.conn.execute(
+            "UPDATE posts SET error_message = NULL, updated_at = ? WHERE id = ?",
+            (datetime.now().isoformat(), post_id),
+        )
+        self.conn.commit()
+
+    def get_error_log(self, limit: int = 50) -> list[dict]:
+        """Get recent publish errors."""
+        rows = self.conn.execute(
+            """SELECT pl.id, pl.post_id, pl.platform, pl.published_at as attempted_at, pl.response_data,
+                      p.caption, p.listing_id
+               FROM publish_log pl
+               LEFT JOIN posts p ON pl.post_id = p.id
+               WHERE pl.platform_post_id = ''
+               ORDER BY pl.published_at DESC
+               LIMIT ?""",
+            (limit,),
+        ).fetchall()
+        results = []
+        for r in rows:
+            error_data = {}
+            try:
+                error_data = json.loads(r["response_data"]) if r["response_data"] else {}
+            except Exception:
+                pass
+            results.append({
+                "id": r["id"],
+                "post_id": r["post_id"],
+                "platform": r["platform"],
+                "attempted_at": r["attempted_at"],
+                "error": error_data.get("error", "Unknown error"),
+                "caption": (r["caption"] or "")[:80],
+                "listing_id": r["listing_id"],
+            })
+        return results
 
     def get_stats(self) -> dict:
         stats = {}
@@ -268,6 +313,10 @@ class Database:
             stats[status.value] = count
         stats["total_listings"] = self.conn.execute(
             "SELECT COUNT(*) FROM listings"
+        ).fetchone()[0]
+        stats["failed_errors"] = self.conn.execute(
+            "SELECT COUNT(*) FROM posts WHERE error_message IS NOT NULL AND status = ?",
+            (PostStatus.APPROVED.value,),
         ).fetchone()[0]
         return stats
 

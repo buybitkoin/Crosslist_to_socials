@@ -128,8 +128,12 @@
 </head>
 <body>
     <div class="header">
-        <h1>Social Media Agent</h1>
+        <div style="display: flex; align-items: center; gap: 12px;">
+            <img src="/static/logo.svg" alt="Logo" style="width: 36px; height: 36px;">
+            <h1>Social Media Agent</h1>
+        </div>
         <div class="header-actions">
+            <a href="/errors" class="btn btn-sm btn-gray">Error Log</a>
             <a href="/settings" class="btn btn-sm btn-gray">Settings</a>
             <button class="theme-toggle" onclick="toggleTheme()" title="Toggle dark mode" id="themeBtn">🌙</button>
         </div>
@@ -186,6 +190,12 @@
             <div class="number">{{ stats.published or 0 }}</div>
             <div class="label">Published</div>
         </div>
+        {% if stats.failed_errors %}
+        <a href="/errors" class="stat-card" style="text-decoration: none; border-color: var(--danger);">
+            <div class="number" style="color: var(--danger);">{{ stats.failed_errors }}</div>
+            <div class="label">Failed</div>
+        </a>
+        {% endif %}
     </div>
 
     <!-- Action Buttons -->
@@ -282,6 +292,7 @@
                 <th>Listing</th>
                 <th>Platform</th>
                 <th>Caption</th>
+                <th>Status</th>
                 <th>Actions</th>
             </tr>
         </thead>
@@ -297,7 +308,22 @@
                 <td><span class="platform-badge {{ post.platform.value }}">{{ post.platform.value }}</span></td>
                 <td><div class="caption-preview">{{ post.caption[:120] }}{% if post.caption|length > 120 %}...{% endif %}</div></td>
                 <td>
-                    <form action="/unapprove/{{ post.id }}" method="post" style="display:inline;">
+                    {% if post.error_message %}
+                    <div class="error-indicator" title="{{ post.error_message }}">
+                        <span style="color: var(--danger); font-weight: 600; font-size: 0.8rem;">Failed</span>
+                        <div style="font-size: 0.75rem; color: var(--danger); max-width: 200px; word-break: break-word; margin-top: 2px;">{{ post.error_message[:100] }}{% if post.error_message|length > 100 %}...{% endif %}</div>
+                    </div>
+                    {% else %}
+                    <span style="color: var(--success); font-size: 0.8rem;">Ready</span>
+                    {% endif %}
+                </td>
+                <td style="white-space: nowrap;">
+                    {% if post.error_message %}
+                    <form action="/clear-error/{{ post.id }}" method="post" style="display:inline;">
+                        <button class="btn btn-sm btn-blue" type="submit">Retry</button>
+                    </form>
+                    {% endif %}
+                    <form action="/unapprove/{{ post.id }}" method="post" style="display:inline; margin-left: 4px;">
                         <button class="btn btn-sm btn-gray" type="submit">Back to Draft</button>
                     </form>
                 </td>
