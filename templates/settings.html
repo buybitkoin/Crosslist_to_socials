@@ -119,6 +119,11 @@
                 <input type="text" id="pinterest_board_id" name="pinterest_board_id" value="{{ settings.pinterest_board_id or '' }}" placeholder="e.g. 123456789012345678">
                 <div class="hint">The board to post pins to. You can find this in the board URL or via the OAuth flow.</div>
             </div>
+            <div class="checkbox-group">
+                <input type="checkbox" id="pinterest_sandbox" name="pinterest_sandbox" {% if settings.pinterest_sandbox %}checked{% endif %}>
+                <label for="pinterest_sandbox">Use Sandbox (testing mode)</label>
+            </div>
+            <div class="hint" style="margin-left: 28px;">When enabled, pins are created in Pinterest's sandbox environment and won't appear on your real boards. Use a sandbox token from the <a href="https://developers.pinterest.com/apps/" target="_blank" style="color: var(--accent);">Developer Portal</a>.</div>
         </div>
 
         <!-- Auto-Posting Settings -->
