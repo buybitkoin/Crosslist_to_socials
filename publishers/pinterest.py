@@ -56,5 +56,12 @@ class PinterestPublisher(Publisher):
         response.raise_for_status()
         return response.json().get("items", [])
 
+    def create_board(self, name: str, description: str = "") -> dict:
+        """Create a new board. Returns the board data including ID."""
+        payload = {"name": name, "description": description, "privacy": "PUBLIC"}
+        response = self.client.post(f"{self.api_base}/boards", json=payload)
+        response.raise_for_status()
+        return response.json()
+
     def close(self):
         self.client.close()

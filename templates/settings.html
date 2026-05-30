@@ -124,6 +124,15 @@
                 <label for="pinterest_sandbox">Use Sandbox (testing mode)</label>
             </div>
             <div class="hint" style="margin-left: 28px;">When enabled, pins are created in Pinterest's sandbox environment and won't appear on your real boards. Use a sandbox token from the <a href="https://developers.pinterest.com/apps/" target="_blank" style="color: var(--accent);">Developer Portal</a>.</div>
+
+            <hr style="border: none; border-top: 1px solid var(--border); margin: 16px 0;">
+            <div style="font-size: 0.9rem; font-weight: 500; margin-bottom: 10px;">Test Connection</div>
+            <div style="display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 8px;">
+                <button class="btn btn-sm btn-blue" type="button" onclick="pinterestTest('test')">Test Credentials</button>
+                <button class="btn btn-sm btn-blue" type="button" onclick="pinterestTest('list_boards')">List Boards</button>
+                <button class="btn btn-sm btn-green" type="button" onclick="createBoard()">Create Sandbox Board</button>
+            </div>
+            <div id="pinterestTestResult" style="font-size: 0.85rem; margin-top: 8px; display: none; padding: 10px 12px; border-radius: 6px;"></div>
         </div>
 
         <!-- Auto-Posting Settings -->
@@ -211,6 +220,79 @@
             const saved = localStorage.getItem('theme') || 'light';
             document.documentElement.setAttribute('data-theme', saved);
         })();
+
+        function showResult(msg, isError) {
+            const el = document.getElementById('pinterestTestResult');
+            el.style.display = 'block';
+            el.textContent = msg;
+            el.style.background = isError ? 'var(--alert-error-bg, #fee2e2)' : 'var(--alert-success-bg, #dcfce7)';
+            el.style.color = isError ? 'var(--alert-error-text, #991b1b)' : 'var(--alert-success-text, #166534)';
+        }
+
+        async function pinterestTest(action) {
+            const el = document.getElementById('pinterestTestResult');
+            el.style.display = 'block';
+            el.style.background = 'var(--hover)';
+            el.style.color = 'var(--text-muted)';
+            el.textContent = 'Testing...';
+
+            const formData = new FormData();
+            formData.append('action', action);
+
+            try {
+                const resp = await fetch('/pinterest-test', { method: 'POST', body: formData });
+                const data = await resp.json();
+
+                if (action === 'list_boards' && data.success && data.boards) {
+                    if (data.boards.length === 0) {
+                        showResult('No boards found. Create one with the button above.', true);
+                    } else {
+                        let msg = 'Boards found:\n';
+                        data.boards.forEach(b => { msg += `  ${b.name} — ID: ${b.id}\n`; });
+                        msg += '\nCopy a Board ID into the field above.';
+                        showResult(msg, false);
+                        el.style.whiteSpace = 'pre-wrap';
+                        el.style.fontFamily = "'SF Mono', 'Consolas', monospace";
+                    }
+                } else if (data.success) {
+                    showResult(data.message || 'Success!', false);
+                } else {
+                    showResult(data.message || data.error || 'Unknown error', true);
+                }
+            } catch (e) {
+                showResult('Request failed: ' + e.message, true);
+            }
+        }
+
+        async function createBoard() {
+            const name = prompt('Board name:', 'Social Media Agent Test');
+            if (!name) return;
+
+            const el = document.getElementById('pinterestTestResult');
+            el.style.display = 'block';
+            el.style.background = 'var(--hover)';
+            el.style.color = 'var(--text-muted)';
+            el.textContent = 'Creating board...';
+
+            const formData = new FormData();
+            formData.append('action', 'create_board');
+            formData.append('board_name', name);
+
+            try {
+                const resp = await fetch('/pinterest-test', { method: 'POST', body: formData });
+                const data = await resp.json();
+
+                if (data.success) {
+                    showResult(`Board created! Name: ${data.board_name}, ID: ${data.board_id}\n\nThis ID has been auto-filled in the Board ID field.`, false);
+                    el.style.whiteSpace = 'pre-wrap';
+                    document.getElementById('pinterest_board_id').value = data.board_id;
+                } else {
+                    showResult(data.message || data.error || 'Failed to create board', true);
+                }
+            } catch (e) {
+                showResult('Request failed: ' + e.message, true);
+            }
+        }
     </script>
 </body>
 </html>

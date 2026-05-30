@@ -472,6 +472,49 @@ def save_settings_route():
     return redirect(url_for("settings_page"))
 
 
+@app.route("/pinterest-test", methods=["POST"])
+def pinterest_test():
+    """Test Pinterest credentials, list boards, and optionally create a sandbox board."""
+    action = request.form.get("action", "test")
+    token, board_id, sandbox = get_pinterest_credentials()
+
+    if not token:
+        return jsonify({"error": "No Pinterest access token configured. Add one in Settings."}), 400
+
+    publisher = PinterestPublisher(token, board_id, sandbox=sandbox)
+
+    if action == "test":
+        # Test credentials
+        valid = publisher.validate_credentials()
+        publisher.close()
+        if valid:
+            return jsonify({"success": True, "message": "Credentials are valid!"})
+        else:
+            return jsonify({"success": False, "message": "Invalid credentials. Token may be expired or have wrong scopes."})
+
+    elif action == "list_boards":
+        try:
+            boards = publisher.get_boards()
+            publisher.close()
+            return jsonify({"success": True, "boards": [{"id": b["id"], "name": b["name"]} for b in boards]})
+        except Exception as e:
+            publisher.close()
+            return jsonify({"success": False, "message": str(e)})
+
+    elif action == "create_board":
+        board_name = request.form.get("board_name", "Social Media Agent Test")
+        try:
+            board = publisher.create_board(board_name, "Auto-created by Social Media Agent for testing")
+            publisher.close()
+            return jsonify({"success": True, "board_id": board["id"], "board_name": board["name"]})
+        except Exception as e:
+            publisher.close()
+            return jsonify({"success": False, "message": str(e)})
+
+    publisher.close()
+    return jsonify({"error": "Unknown action"}), 400
+
+
 @app.route("/run-now", methods=["POST"])
 def run_now():
     """Manually trigger the scheduler pipeline."""
