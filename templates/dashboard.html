@@ -355,7 +355,7 @@
                 </td>
                 <td>{{ post._listing_title[:40] }}</td>
                 <td><span class="platform-badge {{ post.platform.value }}">{{ post.platform.value }}</span></td>
-                <td style="font-size: 0.8rem; color: var(--text-muted);">{{ post.published_at[:16] if post.published_at else '' }}</td>
+                <td style="font-size: 0.8rem; color: var(--text-muted);">{{ post.published_at.strftime('%Y-%m-%d %H:%M') if post.published_at else '' }}</td>
             </tr>
             {% endfor %}
         </tbody>
