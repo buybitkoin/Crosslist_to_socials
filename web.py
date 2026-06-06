@@ -531,11 +531,17 @@ def pinterest_auth_start():
         task_status["message"] = "Set your Pinterest App ID and App Secret in Settings first."
         return redirect(url_for("settings_page"))
 
-    oauth = PinterestOAuth(app_id, app_secret)
+    # Build redirect URI from the current request's host
+    redirect_uri = f"http://{request.host}/auth/pinterest/callback"
+    oauth = PinterestOAuth(app_id, app_secret, redirect_uri=redirect_uri)
     state = secrets.token_urlsafe(16)
+
+    # Save redirect_uri for the callback to use
+    settings["_oauth_redirect_uri"] = redirect_uri
 
     # Save state for verification on callback
     settings["_oauth_state"] = state
+    settings["_oauth_redirect_uri"] = redirect_uri
     save_settings(settings)
 
     auth_url = oauth.get_auth_url(state=state)
@@ -567,8 +573,9 @@ def pinterest_auth_callback():
 
     app_id = settings.get("pinterest_app_id") or config.PINTEREST_APP_ID
     app_secret = settings.get("pinterest_app_secret") or config.PINTEREST_APP_SECRET
+    redirect_uri = settings.get("_oauth_redirect_uri", f"http://{request.host}/auth/pinterest/callback")
 
-    oauth = PinterestOAuth(app_id, app_secret)
+    oauth = PinterestOAuth(app_id, app_secret, redirect_uri=redirect_uri)
 
     try:
         tokens = oauth.exchange_code(code)
