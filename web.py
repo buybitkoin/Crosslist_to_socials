@@ -16,6 +16,8 @@ from scraper.depop_scraper import DepopScraper
 from scraper.models import DepopListing
 from captions.generator import CaptionGenerator
 from publishers.pinterest import PinterestPublisher
+from auth.pinterest_oauth import PinterestOAuth
+import secrets
 
 app = Flask(__name__)
 
@@ -449,6 +451,8 @@ def settings_page():
 def save_settings_route():
     settings = {
         "shop_username": request.form.get("shop_username", "").strip(),
+        "pinterest_app_id": request.form.get("pinterest_app_id", "").strip(),
+        "pinterest_app_secret": request.form.get("pinterest_app_secret", "").strip(),
         "pinterest_access_token": request.form.get("pinterest_access_token", "").strip(),
         "pinterest_board_id": request.form.get("pinterest_board_id", "").strip(),
         "pinterest_sandbox": request.form.get("pinterest_sandbox") == "on",
@@ -512,6 +516,73 @@ def pinterest_test():
 
     publisher.close()
     return jsonify({"error": "Unknown action"}), 400
+
+
+# --- Pinterest OAuth Web Flow ---
+
+@app.route("/auth/pinterest/start")
+def pinterest_auth_start():
+    """Start the Pinterest OAuth flow — redirects user to Pinterest to authorize."""
+    settings = load_settings()
+    app_id = settings.get("pinterest_app_id") or config.PINTEREST_APP_ID
+    app_secret = settings.get("pinterest_app_secret") or config.PINTEREST_APP_SECRET
+
+    if not app_id or not app_secret:
+        task_status["message"] = "Set your Pinterest App ID and App Secret in Settings first."
+        return redirect(url_for("settings_page"))
+
+    oauth = PinterestOAuth(app_id, app_secret)
+    state = secrets.token_urlsafe(16)
+
+    # Save state for verification on callback
+    settings["_oauth_state"] = state
+    save_settings(settings)
+
+    auth_url = oauth.get_auth_url(state=state)
+    return redirect(auth_url)
+
+
+@app.route("/auth/pinterest/callback")
+def pinterest_auth_callback():
+    """Handle Pinterest OAuth callback — exchange code for tokens and save them."""
+    code = request.args.get("code")
+    state = request.args.get("state")
+    error = request.args.get("error")
+
+    if error:
+        task_status["message"] = f"Pinterest authorization denied: {error}"
+        return redirect(url_for("settings_page"))
+
+    if not code:
+        task_status["message"] = "Authorization failed: no code received from Pinterest."
+        return redirect(url_for("settings_page"))
+
+    settings = load_settings()
+
+    # Verify state
+    expected_state = settings.get("_oauth_state", "")
+    if state != expected_state:
+        task_status["message"] = "Authorization failed: state mismatch (possible CSRF attack)."
+        return redirect(url_for("settings_page"))
+
+    app_id = settings.get("pinterest_app_id") or config.PINTEREST_APP_ID
+    app_secret = settings.get("pinterest_app_secret") or config.PINTEREST_APP_SECRET
+
+    oauth = PinterestOAuth(app_id, app_secret)
+
+    try:
+        tokens = oauth.exchange_code(code)
+        # Save tokens to settings
+        settings["pinterest_access_token"] = tokens.get("access_token", "")
+        settings["pinterest_refresh_token"] = tokens.get("refresh_token", "")
+        settings.pop("_oauth_state", None)
+        save_settings(settings)
+
+        task_status["message"] = "Pinterest connected successfully! Access token saved."
+    except Exception as e:
+        task_status["message"] = f"Failed to exchange Pinterest code for token: {e}"
+
+    return redirect(url_for("settings_page"))
 
 
 @app.route("/run-now", methods=["POST"])

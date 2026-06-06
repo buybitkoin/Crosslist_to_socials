@@ -109,10 +109,41 @@
         <!-- Pinterest Settings -->
         <div class="card">
             <h2>Pinterest</h2>
+
+            <!-- OAuth Connection -->
+            <div style="margin-bottom: 20px; padding-bottom: 16px; border-bottom: 1px solid var(--border);">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                    <div style="font-size: 0.9rem; font-weight: 500;">
+                        {% if settings.pinterest_access_token %}
+                        <span style="color: var(--success);">&#10004; Pinterest Connected</span>
+                        {% else %}
+                        <span style="color: var(--text-muted);">Not connected</span>
+                        {% endif %}
+                    </div>
+                    <a href="/auth/pinterest/start" class="btn btn-sm btn-blue" style="text-decoration: none;">
+                        {% if settings.pinterest_access_token %}Reconnect{% else %}Connect Pinterest{% endif %}
+                    </a>
+                </div>
+                <div class="hint">Click to authorize with Pinterest. This securely connects your account without sharing your password.</div>
+            </div>
+
+            <div class="form-group">
+                <label for="pinterest_app_id">App ID (Client ID)</label>
+                <input type="text" id="pinterest_app_id" name="pinterest_app_id" value="{{ settings.pinterest_app_id or '' }}" placeholder="Your Pinterest App ID">
+                <div class="hint">From <a href="https://developers.pinterest.com/apps/" target="_blank" style="color: var(--accent);">Pinterest Developer Portal</a> → your app → App ID.</div>
+            </div>
+            <div class="form-group">
+                <label for="pinterest_app_secret">App Secret</label>
+                <input type="text" id="pinterest_app_secret" name="pinterest_app_secret" value="{{ settings.pinterest_app_secret or '' }}" placeholder="Your Pinterest App Secret">
+                <div class="hint">From the Developer Portal → your app → App Secret. Keep this private.</div>
+            </div>
+
+            <hr style="border: none; border-top: 1px solid var(--border); margin: 16px 0;">
+
             <div class="form-group">
                 <label for="pinterest_access_token">Access Token</label>
-                <input type="text" id="pinterest_access_token" name="pinterest_access_token" value="{{ settings.pinterest_access_token or '' }}" placeholder="Your Pinterest access token">
-                <div class="hint">Get this by running the OAuth flow (python main.py auth pinterest) or from the <a href="https://developers.pinterest.com/apps/" target="_blank" style="color: var(--accent);">Pinterest Developer Portal</a>.</div>
+                <input type="text" id="pinterest_access_token" name="pinterest_access_token" value="{{ settings.pinterest_access_token or '' }}" placeholder="Auto-filled after connecting, or paste manually">
+                <div class="hint">Automatically saved when you click "Connect Pinterest" above. Or paste one manually from the Developer Portal.</div>
             </div>
             <div class="form-group">
                 <label for="pinterest_board_id">Board ID</label>
