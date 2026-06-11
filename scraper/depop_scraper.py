@@ -125,11 +125,13 @@ class CrosslistScraper:
         """Click through PrimeVue paginator to load additional pages."""
         all_new = []
         seen_ids = set()
+        pages_without_new = 0
 
-        for _ in range(20):
+        # Safety cap of 200 pages; the real exit is the disabled Next button
+        for _ in range(200):
             has_next = page.evaluate(
                 """() => {
-                    const nextBtn = document.querySelector('.p-paginator-next:not([disabled])');
+                    const nextBtn = document.querySelector('.p-paginator-next:not([disabled]):not(.p-disabled)');
                     if (nextBtn) {
                         nextBtn.click();
                         return true;
@@ -147,10 +149,20 @@ class CrosslistScraper:
             if not new_items:
                 break
 
+            added = 0
             for item in new_items:
                 if item.id not in seen_ids:
                     all_new.append(item)
                     seen_ids.add(item.id)
+                    added += 1
+
+            # If two consecutive pages yield nothing new, we're looping on the last page
+            if added == 0:
+                pages_without_new += 1
+                if pages_without_new >= 2:
+                    break
+            else:
+                pages_without_new = 0
 
         return all_new
 
@@ -184,12 +196,19 @@ class CrosslistScraper:
             if img_url and img_url.startswith("http"):
                 images = [img_url]
 
-            # Generate a stable ID from title + SKU
+            # Generate a stable ID. Prefer the unique listing UUID embedded in the
+            # image URL (media-na.crosslist.com/<account>/<listing-uuid>/p2.jpg) —
+            # titles can collide when truncated.
             sku = item.get("sku", "")
-            if sku:
+            uuid_match = re.search(
+                r'media[^/]*\.crosslist\.com/[0-9a-f-]+/([0-9a-f-]{36})/', img_url
+            )
+            if uuid_match:
+                listing_id = f"cl-{uuid_match.group(1)}"
+            elif sku:
                 listing_id = f"cl-{sku}"
             elif title:
-                listing_id = "cl-" + re.sub(r'[^a-z0-9]', '-', title.lower())[:60]
+                listing_id = "cl-" + re.sub(r'[^a-z0-9]', '-', title.lower())[:80]
             else:
                 listing_id = f"cl-item-{i}"
 
