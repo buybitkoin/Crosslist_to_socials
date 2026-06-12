@@ -15,6 +15,7 @@ from queue.models import Post, PostStatus, Platform
 from scraper.depop_scraper import DepopScraper
 from scraper.models import DepopListing
 from captions.generator import CaptionGenerator
+from captions import prompts
 from publishers.pinterest import PinterestPublisher
 from auth.pinterest_oauth import PinterestOAuth
 import secrets
@@ -65,6 +66,51 @@ def get_shop_username() -> str:
     return settings.get("shop_username") or config.DEPOP_SHOP_USERNAME
 
 
+DEFAULT_PROMPTS = {
+    "pinterest": prompts.PINTEREST_PROMPT,
+    "instagram": prompts.INSTAGRAM_PROMPT,
+    "pinterest_multi": prompts.PINTEREST_MULTI_PROMPT,
+    "instagram_multi": prompts.INSTAGRAM_MULTI_PROMPT,
+}
+
+PROMPT_LABELS = {
+    "pinterest": "Pinterest (single listing)",
+    "instagram": "Instagram (single listing)",
+    "pinterest_multi": "Pinterest (multi-listing / Shop the Look)",
+    "instagram_multi": "Instagram (multi-listing / Shop the Look)",
+}
+
+# Dummy values used to validate that a custom prompt's placeholders are all valid
+_PROMPT_TEST_VALUES = {
+    "title": "Test item", "description": "Test description", "price": 10.0,
+    "currency": "USD", "brand": "TestBrand", "size": "M",
+    "condition": "Good", "items_block": "Item 1: test",
+}
+
+
+def validate_prompt(text: str) -> str | None:
+    """Test-format a prompt template. Returns an error message, or None if valid."""
+    try:
+        text.format(**_PROMPT_TEST_VALUES)
+        return None
+    except KeyError as e:
+        return f"Unknown placeholder {{{e.args[0]}}} — valid ones are: " + ", ".join(
+            "{%s}" % k for k in _PROMPT_TEST_VALUES
+        )
+    except (IndexError, ValueError) as e:
+        return f"Invalid template formatting: {e}"
+
+
+def make_generator() -> CaptionGenerator:
+    """Build a CaptionGenerator configured with any custom prompts/style from settings."""
+    settings = load_settings()
+    return CaptionGenerator(
+        config.ANTHROPIC_API_KEY,
+        prompt_overrides=settings.get("caption_prompts", {}),
+        style_instructions=settings.get("caption_style", ""),
+    )
+
+
 def get_pinterest_credentials() -> tuple[str, str, bool]:
     """Get Pinterest access token, board ID, and sandbox flag from settings or .env."""
     settings = load_settings()
@@ -106,7 +152,7 @@ def run_scheduled_pipeline():
 
         generator = None
         if use_ai and config.ANTHROPIC_API_KEY:
-            generator = CaptionGenerator(config.ANTHROPIC_API_KEY)
+            generator = make_generator()
 
         for listing in unprocessed:
             if generator:
@@ -284,7 +330,7 @@ def generate():
 
         generator = None
         if use_ai and config.ANTHROPIC_API_KEY:
-            generator = CaptionGenerator(config.ANTHROPIC_API_KEY)
+            generator = make_generator()
 
         try:
             for i, listing in enumerate(listings):
@@ -357,6 +403,67 @@ def approve_all():
         db.approve_post(post.id)
     db.close()
     return redirect(url_for("dashboard"))
+
+
+@app.route("/edit-listing-title", methods=["POST"])
+def edit_listing_title():
+    listing_id = request.form.get("listing_id", "")
+    title = request.form.get("title", "").strip()
+    if listing_id and title:
+        db = get_db()
+        db.update_listing_title(listing_id, title)
+        db.close()
+    return redirect(url_for("dashboard"))
+
+
+@app.route("/export/<status_name>.csv")
+def export_csv(status_name: str):
+    import csv
+    import io
+
+    mapping = {
+        "drafts": PostStatus.DRAFT,
+        "ready": PostStatus.APPROVED,
+        "published": PostStatus.PUBLISHED,
+        "failed": PostStatus.FAILED,
+    }
+    status = mapping.get(status_name)
+    if not status:
+        abort(404)
+
+    db = get_db()
+    posts = db.get_posts(status=status)
+
+    buf = io.StringIO()
+    writer = csv.writer(buf)
+    writer.writerow([
+        "post_id", "listing_id", "listing_title", "platform", "status",
+        "caption", "image_urls", "destination_url", "error_message",
+        "created_at", "published_at",
+    ])
+    for post in posts:
+        listing = db.get_listing(post.listing_id)
+        writer.writerow([
+            post.id,
+            post.listing_id,
+            listing.title if listing else "",
+            post.platform.value,
+            post.status.value,
+            post.caption,
+            " | ".join(post.image_urls),
+            post.destination_url,
+            post.error_message or "",
+            post.created_at,
+            post.published_at or "",
+        ])
+    db.close()
+
+    from flask import Response
+    return Response(
+        buf.getvalue(),
+        mimetype="text/csv",
+        headers={"Content-Disposition": f"attachment; filename={status_name}.csv"},
+    )
 
 
 @app.route("/edit/<int:post_id>", methods=["POST"])
@@ -441,15 +548,33 @@ def publish():
     return redirect(url_for("dashboard"))
 
 
+def _render_settings(settings: dict, prompt_error: str | None = None):
+    overrides = settings.get("caption_prompts", {})
+    active_prompts = {k: overrides.get(k) or v for k, v in DEFAULT_PROMPTS.items()}
+    modified = {k: k in overrides for k in DEFAULT_PROMPTS}
+    return render_template(
+        "settings.html",
+        settings=settings,
+        scheduler=scheduler_state,
+        active_prompts=active_prompts,
+        default_prompts=DEFAULT_PROMPTS,
+        prompt_labels=PROMPT_LABELS,
+        prompt_modified=modified,
+        prompt_error=prompt_error,
+    )
+
+
 @app.route("/settings", methods=["GET"])
 def settings_page():
-    settings = load_settings()
-    return render_template("settings.html", settings=settings, scheduler=scheduler_state)
+    return _render_settings(load_settings())
 
 
 @app.route("/settings", methods=["POST"])
 def save_settings_route():
-    settings = {
+    # Merge into existing settings so values not in the form (e.g. refresh token,
+    # OAuth state) are preserved.
+    settings = load_settings()
+    settings.update({
         "shop_username": request.form.get("shop_username", "").strip(),
         "pinterest_app_id": request.form.get("pinterest_app_id", "").strip(),
         "pinterest_app_secret": request.form.get("pinterest_app_secret", "").strip(),
@@ -461,7 +586,25 @@ def save_settings_route():
         "auto_post_platform": request.form.get("auto_post_platform", "pinterest"),
         "auto_approve": request.form.get("auto_approve") == "on",
         "use_ai_captions": request.form.get("use_ai_captions") == "on",
-    }
+        "caption_style": request.form.get("caption_style", "").strip(),
+    })
+
+    # Custom caption prompts: only store ones that differ from the default,
+    # and validate placeholders before accepting.
+    overrides = {}
+    for key, default in DEFAULT_PROMPTS.items():
+        submitted = request.form.get(f"prompt_{key}", "").strip()
+        if not submitted or submitted == default.strip():
+            continue
+        error = validate_prompt(submitted)
+        if error:
+            return _render_settings(
+                settings,
+                prompt_error=f"{PROMPT_LABELS[key]}: {error} — nothing was saved.",
+            )
+        overrides[key] = submitted
+    settings["caption_prompts"] = overrides
+
     save_settings(settings)
 
     # Update scheduler
@@ -683,13 +826,13 @@ def compose_generate_caption():
 
     if len(listings) == 1:
         if has_ai:
-            generator = CaptionGenerator(config.ANTHROPIC_API_KEY)
+            generator = make_generator()
             caption = generator.generate(listings[0], plat)
         else:
             caption = CaptionGenerator("")._fallback_caption(listings[0], plat)
     else:
         if has_ai:
-            generator = CaptionGenerator(config.ANTHROPIC_API_KEY)
+            generator = make_generator()
             caption = generator.generate_multi(listings, plat)
         else:
             caption = CaptionGenerator("")._fallback_multi_caption(listings, plat)

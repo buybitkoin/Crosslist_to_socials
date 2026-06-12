@@ -18,8 +18,16 @@ class CaptionGenerator:
         Platform.INSTAGRAM: INSTAGRAM_MULTI_PROMPT,
     }
 
-    def __init__(self, api_key: str):
+    def __init__(self, api_key: str, prompt_overrides: dict | None = None, style_instructions: str = ""):
         self.client = anthropic.Anthropic(api_key=api_key)
+        # Keys: "pinterest", "instagram", "pinterest_multi", "instagram_multi"
+        self.prompt_overrides = prompt_overrides or {}
+        self.style_instructions = style_instructions
+
+    def _finalize_prompt(self, prompt: str) -> str:
+        if self.style_instructions:
+            prompt += f"\n\nAdditional style instructions from the shop owner (follow these closely):\n{self.style_instructions}"
+        return prompt
 
     def generate(self, listing: DepopListing, platform: Platform) -> str:
         """Generate a platform-specific caption. Falls back to listing text on error."""
@@ -29,7 +37,7 @@ class CaptionGenerator:
             return self._fallback_caption(listing, platform)
 
     def _call_api(self, listing: DepopListing, platform: Platform) -> str:
-        prompt_template = self.PROMPTS[platform]
+        prompt_template = self.prompt_overrides.get(platform.value) or self.PROMPTS[platform]
         prompt = prompt_template.format(
             title=listing.title,
             description=listing.description,
@@ -39,6 +47,7 @@ class CaptionGenerator:
             size=listing.size or "Not specified",
             condition=listing.condition or "Not specified",
         )
+        prompt = self._finalize_prompt(prompt)
 
         response = self.client.messages.create(
             model="claude-sonnet-4-20250514",
@@ -63,7 +72,8 @@ class CaptionGenerator:
             items_block += f"  - Brand: {listing.brand or 'Unknown'}\n"
             items_block += f"  - Size: {listing.size or 'Not specified'}\n"
 
-        prompt = self.MULTI_PROMPTS[platform].format(items_block=items_block)
+        template = self.prompt_overrides.get(f"{platform.value}_multi") or self.MULTI_PROMPTS[platform]
+        prompt = self._finalize_prompt(template.format(items_block=items_block))
 
         response = self.client.messages.create(
             model="claude-sonnet-4-20250514",

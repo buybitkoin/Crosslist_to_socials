@@ -45,6 +45,14 @@
         .form-group label { display: block; font-size: 0.85rem; font-weight: 500; margin-bottom: 6px; color: var(--text); }
         .form-group .hint { font-size: 0.8rem; color: var(--text-muted); margin-top: 4px; }
 
+        textarea { width: 100%; padding: 10px 12px; border: 1px solid var(--border); border-radius: 6px; font-size: 0.85rem; background: var(--input-bg); color: var(--text); resize: vertical; font-family: inherit; }
+        textarea:focus { outline: none; border-color: var(--accent); }
+        textarea.prompt-editor { min-height: 220px; font-family: 'SF Mono', 'Consolas', monospace; font-size: 0.8rem; }
+        .modified-badge { display: inline-block; background: var(--accent); color: white; font-size: 0.7rem; padding: 1px 8px; border-radius: 10px; margin-left: 8px; vertical-align: middle; }
+        .prompt-error { background: #fee2e2; color: #991b1b; padding: 12px 16px; border-radius: 6px; margin-bottom: 16px; font-size: 0.9rem; }
+        [data-theme="dark"] .prompt-error { background: #451a1a; color: #fca5a5; }
+        details.advanced-prompts summary { cursor: pointer; color: var(--accent); font-size: 0.9rem; font-weight: 500; padding: 4px 0; }
+
         input[type="text"], input[type="number"], select {
             width: 100%;
             padding: 10px 12px;
@@ -99,11 +107,35 @@
         <!-- Caption Settings -->
         <div class="card">
             <h2>Caption Generation</h2>
+            {% if prompt_error %}
+            <div class="prompt-error">{{ prompt_error }}</div>
+            {% endif %}
             <div class="checkbox-group">
                 <input type="checkbox" id="use_ai_captions" name="use_ai_captions" {% if settings.use_ai_captions %}checked{% endif %}>
                 <label for="use_ai_captions">Use AI-generated captions (Claude)</label>
             </div>
-            <div class="hint" style="margin-left: 28px;">When disabled, captions are built from the listing title/description directly. Requires ANTHROPIC_API_KEY in .env file.</div>
+            <div class="hint" style="margin-left: 28px; margin-bottom: 16px;">When disabled, captions are built from the listing title/description directly. Requires ANTHROPIC_API_KEY in .env file.</div>
+
+            <div class="form-group">
+                <label for="caption_style">Caption Style Instructions</label>
+                <textarea id="caption_style" name="caption_style" style="min-height: 70px;" placeholder="e.g. Playful coquette tone, always mention flat measurements, never use the word 'preloved'">{{ settings.caption_style or '' }}</textarea>
+                <div class="hint">Optional. These instructions are added to every AI caption request — the easiest way to tune the voice without editing the full prompts.</div>
+            </div>
+
+            <details class="advanced-prompts" {% if prompt_error %}open{% endif %}>
+                <summary>Advanced: edit full prompts</summary>
+                <div class="hint" style="margin-bottom: 12px;">Placeholders like {{ '{title}' }}, {{ '{price}' }}, {{ '{brand}' }} get filled in per listing — keep the curly braces intact. Prompts are validated on save; "Reset to default" restores the original (the defaults are always kept safe in the code).</div>
+                {% for key, label in prompt_labels.items() %}
+                <div class="form-group">
+                    <label for="prompt_{{ key }}">
+                        {{ label }}
+                        {% if prompt_modified[key] %}<span class="modified-badge">modified</span>{% endif %}
+                    </label>
+                    <textarea class="prompt-editor" id="prompt_{{ key }}" name="prompt_{{ key }}">{{ active_prompts[key] }}</textarea>
+                    <button class="btn btn-sm btn-gray" type="button" style="margin-top: 6px;" onclick="resetPrompt('{{ key }}')">Reset to default</button>
+                </div>
+                {% endfor %}
+            </details>
         </div>
 
         <!-- Pinterest Settings -->
@@ -251,6 +283,15 @@
             const saved = localStorage.getItem('theme') || 'light';
             document.documentElement.setAttribute('data-theme', saved);
         })();
+
+        const DEFAULT_PROMPTS = {{ default_prompts|tojson }};
+
+        function resetPrompt(key) {
+            const ta = document.getElementById('prompt_' + key);
+            ta.value = DEFAULT_PROMPTS[key];
+            const badge = ta.parentElement.querySelector('.modified-badge');
+            if (badge) badge.remove();
+        }
 
         function showResult(msg, isError) {
             const el = document.getElementById('pinterestTestResult');

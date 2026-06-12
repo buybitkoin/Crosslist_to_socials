@@ -148,6 +148,12 @@ class Database:
             )
         return [lookup[lid] for lid in listing_ids if lid in lookup]
 
+    def update_listing_title(self, listing_id: str, title: str):
+        self.conn.execute(
+            "UPDATE listings SET title = ? WHERE id = ?", (title, listing_id)
+        )
+        self.conn.commit()
+
     def get_unprocessed_listings(self, platform: Platform) -> list[DepopListing]:
         """Get listings that don't have a post for the given platform yet."""
         rows = self.conn.execute(
