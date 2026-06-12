@@ -194,7 +194,10 @@ class CrosslistScraper:
             images = []
             img_url = item.get("image", "")
             if img_url and img_url.startswith("http"):
-                images = [img_url]
+                # The dashboard serves 350px thumbnails as .../p2.jpg; the
+                # full-resolution original (1600px) lives at .../p1.jpg.
+                full_url = re.sub(r'/p2\.(jpg|jpeg|png|webp)$', r'/p1.\1', img_url)
+                images = [full_url]
 
             # Generate a stable ID. Prefer the unique listing UUID embedded in the
             # image URL (media-na.crosslist.com/<account>/<listing-uuid>/p2.jpg) —
