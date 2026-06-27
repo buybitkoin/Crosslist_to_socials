@@ -975,5 +975,9 @@ init_scheduler()
 
 
 if __name__ == "__main__":
-    print("Starting Social Media Agent on http://localhost:5000")
-    app.run(host="0.0.0.0", port=5000, debug=True)
+    # Port is configurable via the PORT env var (default 5050 — avoids macOS
+    # AirPlay Receiver on 5000). Host defaults to 0.0.0.0 for LAN access.
+    port = int(os.getenv("PORT", "5050"))
+    host = os.getenv("HOST", "0.0.0.0")
+    print(f"Starting Crosslist To Socials on http://localhost:{port}")
+    app.run(host=host, port=port, debug=True)
