@@ -120,7 +120,7 @@
                 {% for listing in listings %}
                 <div class="listing-item" data-id="{{ listing.id }}" data-title="{{ listing.title|lower }}" onclick="toggleListing(this)">
                     {% if listing.images %}
-                    <img src="{{ listing.images[0] }}" alt="" loading="lazy">
+                    <img src="{{ listing.images[0] | img_url }}" alt="" loading="lazy">
                     {% else %}
                     <div class="no-img">No img</div>
                     {% endif %}

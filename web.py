@@ -1,5 +1,6 @@
 """Flask web UI for the Social Media Agent."""
 import json
+import os
 import sys
 import threading
 from datetime import datetime
@@ -7,7 +8,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent))
 
-from flask import Flask, render_template, request, jsonify, redirect, url_for, abort
+from flask import Flask, render_template, request, jsonify, redirect, url_for, abort, send_from_directory
 
 import config
 from queue.database import Database
@@ -16,11 +17,42 @@ from scraper.depop_scraper import DepopScraper
 from scraper.models import DepopListing
 from captions.generator import CaptionGenerator
 from captions import prompts
+from sources import published_db
 from publishers.pinterest import PinterestPublisher
 from auth.pinterest_oauth import PinterestOAuth
 import secrets
 
 app = Flask(__name__)
+
+
+@app.template_filter("img_url")
+def img_url_filter(value: str) -> str:
+    """Render either a remote URL (as-is) or a local CrossListingAgent image
+    (served through /published-image/) so the browser can display it."""
+    if not value:
+        return ""
+    if value.startswith("http://") or value.startswith("https://"):
+        return value
+    return url_for("published_image", filename=os.path.basename(value))
+
+
+def generate_caption_for(generator, listing, platform: Platform) -> str:
+    """Produce a caption following the per-platform rule:
+
+    - Instagram with a rich, ready-made description (from CrossListingAgent):
+      use it as-is — hashtags belong there.
+    - Otherwise (Pinterest, or a thin description like a scraped title): reshape
+      with Claude if available, else fall back to the built-from-fields caption.
+    """
+    desc = (listing.description or "").strip()
+    has_rich_desc = len(desc) > 60 and desc != (listing.title or "").strip()
+
+    if platform == Platform.INSTAGRAM and has_rich_desc:
+        return desc
+
+    if generator:
+        return generator.generate(listing, platform)
+    return CaptionGenerator("")._fallback_caption(listing, platform)
 
 # Track background task status
 task_status = {"running": False, "message": "", "type": "", "progress": 0, "step": ""}
@@ -155,10 +187,7 @@ def run_scheduled_pipeline():
             generator = make_generator()
 
         for listing in unprocessed:
-            if generator:
-                caption = generator.generate(listing, plat)
-            else:
-                caption = CaptionGenerator("")._fallback_caption(listing, plat)
+            caption = generate_caption_for(generator, listing, plat)
 
             post = Post(
                 listing_id=listing.id,
@@ -257,6 +286,7 @@ def dashboard():
         shop_username=settings.get("shop_username", ""),
         has_pinterest=bool(get_pinterest_credentials()[0]),
         has_instagram=bool(config.INSTAGRAM_ACCESS_TOKEN),
+        has_published_source=published_db.is_available(),
         settings=settings,
         scheduler=scheduler_state,
     )
@@ -301,6 +331,57 @@ def scrape():
     return redirect(url_for("dashboard"))
 
 
+@app.route("/import-published", methods=["POST"])
+def import_published():
+    """Import finished listings from CrossListingAgent's published.db."""
+    if task_status["running"]:
+        return jsonify({"error": "A task is already running"}), 409
+
+    def run_import():
+        task_status["running"] = True
+        task_status["type"] = "import"
+        task_status["step"] = "Importing from CrossListingAgent"
+        task_status["progress"] = 15
+        task_status["message"] = "Reading published listings..."
+        try:
+            if not published_db.is_available():
+                task_status["progress"] = 100
+                task_status["message"] = (
+                    f"CrossListingAgent database not found at {config.PUBLISHED_DB_PATH}. "
+                    "Set CROSSLISTING_DIR (or PUBLISHED_DB_PATH) to its location."
+                )
+                return
+
+            listings = published_db.fetch_published_listings()
+            task_status["progress"] = 60
+            task_status["message"] = f"Found {len(listings)} listings. Saving new ones..."
+
+            db = get_db()
+            new_count = 0
+            for i, listing in enumerate(listings):
+                if db.save_listing(listing):
+                    new_count += 1
+                task_status["progress"] = 60 + int(40 * (i + 1) / max(len(listings), 1))
+            db.close()
+
+            task_status["progress"] = 100
+            task_status["message"] = f"Done! Found {len(listings)} listings, {new_count} new."
+        except Exception as e:
+            task_status["message"] = f"Error: {e}"
+        finally:
+            task_status["running"] = False
+
+    threading.Thread(target=run_import, daemon=True).start()
+    return redirect(url_for("dashboard"))
+
+
+@app.route("/published-image/<path:filename>")
+def published_image(filename: str):
+    """Serve a CrossListingAgent image so it can be previewed in the dashboard.
+    Restricted to the configured images folder; basename-only prevents traversal."""
+    return send_from_directory(config.PUBLISHED_IMAGES_DIR, os.path.basename(filename))
+
+
 @app.route("/generate", methods=["POST"])
 def generate():
     platform = request.form.get("platform", "pinterest")
@@ -337,10 +418,7 @@ def generate():
                 task_status["progress"] = 5 + int(95 * i / len(listings))
                 task_status["message"] = f"Generating caption {i + 1}/{len(listings)}: {listing.title[:50]}..."
 
-                if generator:
-                    caption = generator.generate(listing, plat)
-                else:
-                    caption = CaptionGenerator("")._fallback_caption(listing, plat)
+                caption = generate_caption_for(generator, listing, plat)
 
                 post = Post(
                     listing_id=listing.id,

@@ -1,3 +1,6 @@
+import base64
+import mimetypes
+
 import httpx
 
 from publishers.base import Publisher
@@ -22,26 +25,36 @@ class PinterestPublisher(Publisher):
 
     def publish(self, post: Post) -> str:
         """Create a pin on Pinterest. Returns the pin ID."""
-        image_url = post.image_urls[0] if post.image_urls else ""
+        image = post.image_urls[0] if post.image_urls else ""
 
         payload = {
             "board_id": self.board_id,
             "title": post.caption[:100],
             "description": post.caption,
-            "link": post.destination_url,
-            "media_source": {
-                "source_type": "image_url",
-                "url": image_url,
-                "is_standard": True,
-            },
+            "media_source": self._build_media_source(image),
             "alt_text": post.caption[:500],
         }
+        # link is optional — only send it if we actually have a destination
+        if post.destination_url:
+            payload["link"] = post.destination_url
 
         response = self.client.post(f"{self.api_base}/pins", json=payload)
         if response.status_code >= 400:
             raise Exception(f"Pinterest API error {response.status_code}: {response.text[:500]}")
         data = response.json()
         return data["id"]
+
+    def _build_media_source(self, image: str) -> dict:
+        """Build the media_source. Remote URLs are passed through; local file
+        paths are read and uploaded inline as base64 (Pinterest API v5)."""
+        if image.startswith("http://") or image.startswith("https://"):
+            return {"source_type": "image_url", "url": image, "is_standard": True}
+
+        # Local file from CrossListingAgent — upload bytes directly.
+        with open(image, "rb") as f:
+            data = base64.b64encode(f.read()).decode("ascii")
+        content_type = mimetypes.guess_type(image)[0] or "image/jpeg"
+        return {"source_type": "image_base64", "content_type": content_type, "data": data}
 
     def validate_credentials(self) -> dict:
         """Check if the access token is valid by fetching user info. Returns status details."""

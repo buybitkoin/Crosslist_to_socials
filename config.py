@@ -26,3 +26,13 @@ DATABASE_PATH = os.getenv("DATABASE_PATH", str(DATA_DIR / "posts.db"))
 IMAGE_DOWNLOAD_DIR = os.getenv("IMAGE_DOWNLOAD_DIR", str(DATA_DIR / "images"))
 
 Path(IMAGE_DOWNLOAD_DIR).mkdir(parents=True, exist_ok=True)
+
+# --- CrossListingAgent integration (read-only source of finished listings) ---
+# Root of the CrossListingAgent project on the same Mac. See published_db_integration.md.
+CROSSLISTING_DIR = os.getenv("CROSSLISTING_DIR", "/Users/Shared/CrossListingAgent")
+PUBLISHED_DB_PATH = os.getenv(
+    "PUBLISHED_DB_PATH", str(Path(CROSSLISTING_DIR) / "data" / "published.db")
+)
+PUBLISHED_IMAGES_DIR = os.getenv(
+    "PUBLISHED_IMAGES_DIR", str(Path(CROSSLISTING_DIR) / "data" / "published" / "images")
+)
